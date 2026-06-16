@@ -200,5 +200,6 @@ if __name__ == "__main__":
     worker = threading.Thread(target=background_alert_harvester, daemon=True)
     worker.start()
     
-    print("Starting KML Presenter server on http://127.0.0.1:5000", flush=True)
-    app.run(port=5000)
+    # Changing host to '0.0.0.0' opens the server up to your local network
+    print("Starting KML Presenter server on local network...", flush=True)
+    app.run(host='0.0.0.0', port=5000)
