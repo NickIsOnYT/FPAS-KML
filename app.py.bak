@@ -1,0 +1,160 @@
+from flask import Flask, Response
+import requests
+import simplekml
+import xml.etree.ElementTree as ET
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
+import time
+import sys
+
+app = Flask(__name__)
+API_BASE_URL = "https://alerts.kde.org"
+
+# Local database cache
+ALERT_CACHE = {}
+cache_lock = threading.Lock()
+
+def get_kml_color(severity, alpha=150):
+    alpha_hex = f'{alpha:02x}'
+    severity = severity.lower()
+    if 'minor' in severity: base_color = '00ffff'
+    elif 'moderate' in severity: base_color = '00a5ff'
+    elif 'severe' in severity: base_color = '0000ff'
+    elif 'extreme' in severity: base_color = '800080'
+    else: base_color = 'ffffff'
+    return alpha_hex + base_color
+
+def fetch_single_alert(alert_id):
+    """Fetches and parses a single alert payload."""
+    try:
+        r = requests.get(f"{API_BASE_URL}/alert/{alert_id}", timeout=5)
+        if r.status_code != 200: return alert_id, None
+        
+        root = ET.fromstring(r.content)
+        info = root.find('.//{*}info')
+        if info is None: return alert_id, None
+
+        event = info.findtext('{*}event', 'Alert')
+        area = info.find('{*}area')
+        
+        coords = []
+        area_desc = "Unknown Location"
+        
+        if area is not None:
+            area_desc = area.findtext('{*}areaDesc') or "Unknown Location"
+            poly_node = area.find('{*}polygon')
+            circle_node = area.find('{*}circle')
+            
+            if poly_node is not None and poly_node.text:
+                for pair in poly_node.text.split(): 
+                    if ',' in pair:
+                        lat, lon = pair.split(',')
+                        coords.append((float(lon), float(lat)))
+            
+            elif circle_node is not None and circle_node.text:
+                parts = circle_node.text.split()
+                if parts:
+                    lat, lon = parts[0].split(',')
+                    coords.append((float(lon), float(lat)))
+        
+        if coords:
+            return alert_id, {
+                "title": f"{event} - {area_desc}",
+                "severity": info.findtext('{*}severity', 'Unknown'),
+                "description": info.findtext('{*}description', 'No description.'),
+                "coords": coords
+            }
+    except Exception:
+        pass
+    return alert_id, None
+
+def background_alert_harvester():
+    """Runs forever in the background, updating the cache every 5 minutes."""
+    global ALERT_CACHE
+    print("[Background Thread] Started alert harvester worker.", flush=True)
+    
+    while True:
+        try:
+            print("\n[Background Thread] Syncing with global server...", flush=True)
+            url = f"{API_BASE_URL}/alert/area?min_lat=-90&max_lat=90&min_lon=-180&max_lon=180"
+            r = requests.get(url, timeout=10)
+            
+            if r.status_code == 200:
+                active_ids = set(r.json())
+                print(f"[Background Thread] Server has {len(active_ids)} active alerts.", flush=True)
+                
+                # 1. Clear expired alerts
+                with cache_lock:
+                    cached_ids = list(ALERT_CACHE.keys())
+                    for cid in cached_ids:
+                        if cid not in active_ids:
+                            del ALERT_CACHE[cid]
+                
+                # 2. Identify new alerts
+                new_ids = [aid for aid in active_ids if aid not in ALERT_CACHE]
+                total_new = len(new_ids)
+                print(f"[Background Thread] Found {total_new} brand new alerts to parse.", flush=True)
+                
+                # 3. Fetch new alerts with a real-time progress bar
+                if total_new > 0:
+                    processed_count = 0
+                    
+                    with ThreadPoolExecutor(max_workers=25) as executor:
+                        # Submit all tasks to the thread pool
+                        futures = {executor.submit(fetch_single_alert, aid): aid for aid in new_ids}
+                        
+                        # As each thread completes, calculate and print the percentage
+                        for future in as_completed(futures):
+                            aid, data = future.result()
+                            processed_count += 1
+                            
+                            if data:
+                                with cache_lock:
+                                    ALERT_CACHE[aid] = data
+                            
+                            # Calculate percentage and rewrite the same console line
+                            percent = (processed_count / total_new) * 100
+                            sys.stdout.write(f"\r[Background Thread] Progress: {percent:.1f}% ({processed_count}/{total_new} completed)")
+                            sys.stdout.flush()
+                    
+                    # Print a newline once the progress loop hits 100%
+                    print("", flush=True)
+                                
+                print(f"[Background Thread] Sync complete. Local database holds {len(ALERT_CACHE)} valid mapped alerts.", flush=True)
+            else:
+                print(f"[Background Thread] API error ({r.status_code}), retrying later.", flush=True)
+                
+        except Exception as e:
+            print(f"[Background Thread] Error during harvesting: {e}", flush=True)
+            
+        time.sleep(300)
+
+@app.route('/alerts.kml')
+def serve_kml():
+    print(f"Google Earth requested map. Serving {len(ALERT_CACHE)} alerts from local memory instantly!", flush=True)
+    kml = simplekml.Kml()
+    
+    with cache_lock:
+        cached_alerts = list(ALERT_CACHE.values())
+        
+    for item in cached_alerts:
+        folder = kml.newfolder(name=item["title"])
+        kml_color = get_kml_color(item["severity"])
+        
+        if len(item["coords"]) > 1:
+            pol = folder.newpolygon(name=item["title"], outerboundaryis=item["coords"])
+            pol.style.polystyle.color = kml_color
+            pol.style.linestyle.color = kml_color
+        
+        pin = folder.newpoint(name=item["title"], coords=[item["coords"][0]])
+        pin.description = item["description"]
+        pin.style.iconstyle.color = kml_color
+
+    return Response(kml.kml(), mimetype='application/vnd.google-earth.kml+xml')
+
+if __name__ == "__main__":
+    worker = threading.Thread(target=background_alert_harvester, daemon=True)
+    worker.start()
+    
+    print("Starting KML Presenter server on http://127.0.0.1:5000", flush=True)
+    app.run(port=5000)

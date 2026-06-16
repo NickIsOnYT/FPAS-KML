@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <NetworkLink>
+    <name>FOSS Live Alerts</name>
+    <refreshVisibility>1</refreshVisibility>
+    <Link>
+      <href>http://localhost:5000/alerts.kml</href>
+      <refreshMode>onInterval</refreshMode>
+      <refreshInterval>300</refreshInterval> </Link>
+  </NetworkLink>
+</kml>
