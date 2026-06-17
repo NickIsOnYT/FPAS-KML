@@ -6,7 +6,7 @@ A lightweight Python application that harvests global Common Alerting Protocol (
 
 ## Setup and Installation
 
-- Get [Google Earth](https://www.google.com/earth/about/versions/)
+- Get [Google Earth Pro](https://www.google.com/earth/about/versions/)
 - Get [Python 3.14.3](https://www.python.org/downloads/release/python-3143/)
 - Make sure to add it to your paths
 
