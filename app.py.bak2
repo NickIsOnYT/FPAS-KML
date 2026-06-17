@@ -1,0 +1,679 @@
+from flask import Flask, Response
+import requests
+import simplekml
+import xml.etree.ElementTree as ET
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
+import time
+import sys
+import json
+
+app = Flask(__name__)
+API_BASE_URL = "https://alerts.kde.org"
+
+# Local database cache
+ALERT_CACHE = {}
+cache_lock = threading.Lock()
+
+def get_kml_color(severity, alpha=150):
+    alpha_hex = f'{alpha:02x}'
+    severity = severity.lower()
+    if 'minor' in severity: base_color = '00ffff'
+    elif 'moderate' in severity: base_color = '00a5ff'
+    elif 'severe' in severity: base_color = '0000ff'
+    elif 'extreme' in severity: base_color = '800080'
+    else: base_color = 'ffffff'
+    return alpha_hex + base_color
+
+def calculate_centroid(coords):
+    if not coords:
+        return (0.0, 0.0)
+    unique_coords = list(set(coords))
+    avg_lon = sum(c[0] for c in unique_coords) / len(unique_coords)
+    avg_lat = sum(c[1] for c in unique_coords) / len(unique_coords)
+    return (avg_lon, avg_lat)
+
+def fetch_single_alert(alert_id):
+    try:
+        r = requests.get(f"{API_BASE_URL}/alert/{alert_id}", timeout=5)
+        if r.status_code != 200: return alert_id, None
+        
+        root = ET.fromstring(r.content)
+        info = root.find('.//{*}info')
+        if info is None: return alert_id, None
+
+        event = info.findtext('{*}event', 'Alert')
+        area = info.find('{*}area')
+        
+        coords = []
+        area_desc = "Unknown Location"
+        
+        if area is not None:
+            area_desc = area.findtext('{*}areaDesc') or "Unknown Location"
+            poly_node = area.find('{*}polygon')
+            circle_node = area.find('{*}circle')
+            
+            if poly_node is not None and poly_node.text:
+                for pair in poly_node.text.split(): 
+                    if ',' in pair:
+                        lat, lon = pair.split(',')
+                        coords.append((float(lon), float(lat)))
+            
+            elif circle_node is not None and circle_node.text:
+                parts = circle_node.text.split()
+                if parts:
+                    lat, lon = parts[0].split(',')
+                    coords.append((float(lon), float(lat)))
+        
+        if coords:
+            return alert_id, {
+                "id": alert_id,
+                "event_type": event, # "Severe Thunderstorm", "Flood", etc.
+                "title": f"{event} - {area_desc}",
+                "severity": info.findtext('{*}severity', 'Unknown'),
+                "description": info.findtext('{*}description', 'No description.'),
+                "coords": coords
+            }
+    except Exception:
+        pass
+    return alert_id, None
+
+def background_alert_harvester():
+    global ALERT_CACHE
+    print("[Background Thread] Started alert harvester worker.", flush=True)
+    
+    while True:
+        try:
+            print("\n[Background Thread] Syncing with global server...", flush=True)
+            url = f"{API_BASE_URL}/alert/area?min_lat=-90&max_lat=90&min_lon=-180&max_lon=180"
+            r = requests.get(url, timeout=10)
+            
+            if r.status_code == 200:
+                active_ids = set(r.json())
+                print(f"[Background Thread] Server has {len(active_ids)} active alerts.", flush=True)
+                
+                with cache_lock:
+                    cached_ids = list(ALERT_CACHE.keys())
+                    for cid in cached_ids:
+                        if cid not in active_ids:
+                            del ALERT_CACHE[cid]
+                
+                new_ids = [aid for aid in active_ids if aid not in ALERT_CACHE]
+                total_new = len(new_ids)
+                print(f"[Background Thread] Found {total_new} brand new alerts to parse.", flush=True)
+                
+                if total_new > 0:
+                    processed_count = 0
+                    with ThreadPoolExecutor(max_workers=25) as executor:
+                        futures = {executor.submit(fetch_single_alert, aid): aid for aid in new_ids}
+                        for future in as_completed(futures):
+                            aid, data = future.result()
+                            processed_count += 1
+                            if data:
+                                with cache_lock:
+                                    ALERT_CACHE[aid] = data
+                            
+                            percent = (processed_count / total_new) * 100
+                            sys.stdout.write(f"\r[Background Thread] Progress: {percent:.1f}% ({processed_count}/{total_new} completed)")
+                            sys.stdout.flush()
+                    print("", flush=True)
+                                
+                print(f"[Background Thread] Sync complete. Local database holds {len(ALERT_CACHE)} valid mapped alerts.", flush=True)
+            else:
+                print(f"[Background Thread] API error ({r.status_code}), retrying later.", flush=True)
+                
+        except Exception as e:
+            print(f"[Background Thread] Error during harvesting: {e}", flush=True)
+            
+        time.sleep(300)
+
+@app.route('/alerts.kml')
+def serve_kml():
+    print(f"Google Earth requested map. Serving {len(ALERT_CACHE)} alerts from local memory instantly!", flush=True)
+    kml = simplekml.Kml()
+    
+    with cache_lock:
+        cached_alerts = list(ALERT_CACHE.values())
+        
+# THE GLOBAL TRANSLATION & CONSOLIDATION MAP
+CATEGORY_MAPPING = {
+    # === STORMS, TORNADOS, FLOODS & WINDS ===
+    "acumulado de chuva": "Storms, Tornados, Floods & Winds",
+    "avertissement de cyclone": "Storms, Tornados, Floods & Winds",
+    "aviso amarelo precipitação": "Storms, Tornados, Floods & Winds",
+    "aviso amarelo trovoada": "Storms, Tornados, Floods & Winds",
+    "aviso amarelo trovoadas": "Storms, Tornados, Floods & Winds",
+    "aviso de lluvias de nivel amarillo": "Storms, Tornados, Floods & Winds",
+    "aviso de lluvias de nivel naranja": "Storms, Tornados, Floods & Winds",
+    "aviso de tormentas de nivel amarillo": "Storms, Tornados, Floods & Winds",
+    "aviso laranja trovoada": "Storms, Tornados, Floods & Winds",
+    "awareness_type=1, awareness_level=1": "Storms, Tornados, Floods & Winds",
+    "awareness_type=1, awareness_level=2": "Storms, Tornados, Floods & Winds",
+    "awareness_type=1, awareness_level=3": "Storms, Tornados, Floods & Winds",
+    "awareness_type=1, awareness_level=4": "Storms, Tornados, Floods & Winds",
+    "awareness_type=3, awareness_level=1": "Storms, Tornados, Floods & Winds",
+    "awareness_type=3, awareness_level=2": "Storms, Tornados, Floods & Winds",
+    "awareness_type=3, awareness_level=3": "Storms, Tornados, Floods & Winds",
+    "awareness_type=3, awareness_level=4": "Storms, Tornados, Floods & Winds",
+    "awareness_type=4, awareness_level=1": "Storms, Tornados, Floods & Winds",
+    "awareness_type=4, awareness_level=2": "Storms, Tornados, Floods & Winds",
+    "awareness_type=4, awareness_level=3": "Storms, Tornados, Floods & Winds",
+    "awareness_type=4, awareness_level=4": "Storms, Tornados, Floods & Winds",
+    "awareness_type=5, awareness_level=1": "Storms, Tornados, Floods & Winds",
+    "awareness_type=5, awareness_level=2": "Storms, Tornados, Floods & Winds",
+    "awareness_type=5, awareness_level=3": "Storms, Tornados, Floods & Winds",
+    "awareness_type=5, awareness_level=4": "Storms, Tornados, Floods & Winds",
+    "chuva moderada a forte e trovoada": "Storms, Tornados, Floods & Winds",
+    "chuva moderada a forte e trovoadas": "Storms, Tornados, Floods & Winds",
+    "chuvas intensas": "Storms, Tornados, Floods & Winds",
+    "dense fog": "Storms, Tornados, Floods & Winds",
+    "dust": "Storms, Tornados, Floods & Winds",
+    "dust storm": "Storms, Tornados, Floods & Winds",
+    "dust storm (sandstorm)": "Storms, Tornados, Floods & Winds",
+    "duststorm": "Storms, Tornados, Floods & Winds",
+    "duststorm (sandstorm)": "Storms, Tornados, Floods & Winds",
+    "flash flood events": "Storms, Tornados, Floods & Winds",
+    "flash flood warning": "Storms, Tornados, Floods & Winds",
+    "flood": "Storms, Tornados, Floods & Winds",
+    "flood advisory": "Storms, Tornados, Floods & Winds",
+    "flood risk": "Storms, Tornados, Floods & Winds",
+    "flood warning": "Storms, Tornados, Floods & Winds",
+    "flood watch": "Storms, Tornados, Floods & Winds",
+    "flooding": "Storms, Tornados, Floods & Winds",
+    "flooding risk": "Storms, Tornados, Floods & Winds",
+    "fog": "Storms, Tornados, Floods & Winds",
+    "fog advisory": "Storms, Tornados, Floods & Winds",
+    "gaile": "Storms, Tornados, Floods & Winds",
+    "gaile advisory": "Storms, Tornados, Floods & Winds",
+    "gaile statement": "Storms, Tornados, Floods & Winds",
+    "gaile warning": "Storms, Tornados, Floods & Winds",
+    "gaile watch": "Storms, Tornados, Floods & Winds",
+    "gale": "Storms, Tornados, Floods & Winds",
+    "gale advisory": "Storms, Tornados, Floods & Winds",
+    "gale statement": "Storms, Tornados, Floods & Winds",
+    "gale warning": "Storms, Tornados, Floods & Winds",
+    "gale watch": "Storms, Tornados, Floods & Winds",
+    "gewitter": "Storms, Tornados, Floods & Winds",
+    "gewitterwarnung": "Storms, Tornados, Floods & Winds",
+    "grains": "Storms, Tornados, Floods & Winds",
+    "hail": "Storms, Tornados, Floods & Winds",
+    "hail advisory": "Storms, Tornados, Floods & Winds",
+    "hail statement": "Storms, Tornados, Floods & Winds",
+    "hail warning": "Storms, Tornados, Floods & Winds",
+    "hail watch": "Storms, Tornados, Floods & Winds",
+    "heavy rain": "Storms, Tornados, Floods & Winds",
+    "heavy rain and lightning": "Storms, Tornados, Floods & Winds",
+    "heavy to very heavy rainfall": "Storms, Tornados, Floods & Winds",
+    "heavyrain advisory": "Storms, Tornados, Floods & Winds",
+    "high wind advisory": "Storms, Tornados, Floods & Winds",
+    "high wind statement": "Storms, Tornados, Floods & Winds",
+    "high wind warning": "Storms, Tornados, Floods & Winds",
+    "high wind watch": "Storms, Tornados, Floods & Winds",
+    "hujan lebat dan petir": "Storms, Tornados, Floods & Winds",
+    "hydrologic outlook": "Storms, Tornados, Floods & Winds",
+    "inland wind": "Storms, Tornados, Floods & Winds",
+    "inondation": "Storms, Tornados, Floods & Winds",
+    "inundaciones repentinas": "Storms, Tornados, Floods & Winds",
+    "kuling": "Storms, Tornados, Floods & Winds",
+    "lake wind advisory": "Storms, Tornados, Floods & Winds",
+    "lake wind statement": "Storms, Tornados, Floods & Winds",
+    "lake wind warning": "Storms, Tornados, Floods & Winds",
+    "lake wind watch": "Storms, Tornados, Floods & Winds",
+    "light rain": "Storms, Tornados, Floods & Winds",
+    "light thunderstorm with surface wind": "Storms, Tornados, Floods & Winds",
+    "light thunderstorms": "Storms, Tornados, Floods & Winds",
+    "lightning, gusty winds, and thunderstorm": "Storms, Tornados, Floods & Winds",
+    "lightning, thunderstorm, and gusty winds": "Storms, Tornados, Floods & Winds",
+    "lluvias": "Storms, Tornados, Floods & Winds",
+    "lluvias y tormentas": "Storms, Tornados, Floods & Winds",
+    "meteorological risk of floods and flash floods in small and medium rivers": "Storms, Tornados, Floods & Winds",
+    "moderate thunderstorm warning": "Storms, Tornados, Floods & Winds",
+    "moderate thunderstorms": "Storms, Tornados, Floods & Winds",
+    "moderate thunderstorms with surface wind": "Storms, Tornados, Floods & Winds",
+    "mountain flood risk": "Storms, Tornados, Floods & Winds",
+    "near gale": "Storms, Tornados, Floods & Winds",
+    "nevihte - zmerna ogroženost": "Storms, Tornados, Floods & Winds",
+    "niebla": "Storms, Tornados, Floods & Winds",
+    "orage": "Storms, Tornados, Floods & Winds",
+    "orages": "Storms, Tornados, Floods & Winds",
+    "orages/lignes de grains": "Storms, Tornados, Floods & Winds",
+    "pluie": "Storms, Tornados, Floods & Winds",
+    "pluie/période humide": "Storms, Tornados, Floods & Winds",
+    "poussiere": "Storms, Tornados, Floods & Winds",
+    "precipitation": "Storms, Tornados, Floods & Winds",
+    "precipitaciones moderadas": "Storms, Tornados, Floods & Winds",
+    "rain": "Storms, Tornados, Floods & Winds",
+    "rainstorm": "Storms, Tornados, Floods & Winds",
+    "raju ukonilma": "Storms, Tornados, Floods & Winds",
+    "riverine flood": "Storms, Tornados, Floods & Winds",
+    "sadevaroitus": "Storms, Tornados, Floods & Winds",
+    "sand storm": "Storms, Tornados, Floods & Winds",
+    "sandstorm": "Storms, Tornados, Floods & Winds",
+    "sárga heves zivatar figyelmeztetés": "Storms, Tornados, Floods & Winds",
+    "severe thunderstorm warning": "Storms, Tornados, Floods & Winds",
+    "severe thunderstorm watch": "Storms, Tornados, Floods & Winds",
+    "severe thunderstorms with surface wind": "Storms, Tornados, Floods & Winds",
+    "small and medium-sized rivers; flood; meteorological risk": "Storms, Tornados, Floods & Winds",
+    "smarkus vėjas": "Storms, Tornados, Floods & Winds",
+    "squall": "Storms, Tornados, Floods & Winds",
+    "squall advisory": "Storms, Tornados, Floods & Winds",
+    "squall line": "Storms, Tornados, Floods & Winds",
+    "squall line advisory": "Storms, Tornados, Floods & Winds",
+    "squall line statement": "Storms, Tornados, Floods & Winds",
+    "squall line warning": "Storms, Tornados, Floods & Winds",
+    "squall lines": "Storms, Tornados, Floods & Winds",
+    "squall statement": "Storms, Tornados, Floods & Winds",
+    "squall warning": "Storms, Tornados, Floods & Winds",
+    "squalls": "Storms, Tornados, Floods & Winds",
+    "starkregen": "Storms, Tornados, Floods & Winds",
+    "starkwind": "Storms, Tornados, Floods & Winds",
+    "starkwindwarnung": "Storms, Tornados, Floods & Winds",
+    "sturm": "Storms, Tornados, Floods & Winds",
+    "storm  surge": "Storms, Tornados, Floods & Winds",
+    "storm surge advisory": "Storms, Tornados, Floods & Winds",
+    "storm surge statement": "Storms, Tornados, Floods & Winds",
+    "storm surge warning": "Storms, Tornados, Floods & Winds",
+    "storm surge watch": "Storms, Tornados, Floods & Winds",
+    "strong wind": "Storms, Tornados, Floods & Winds",
+    "strong wind warning": "Storms, Tornados, Floods & Winds",
+    "strong winds": "Storms, Tornados, Floods & Winds",
+    "strong winds and high seas": "Storms, Tornados, Floods & Winds",
+    "tempestade": "Storms, Tornados, Floods & Winds",
+    "thunder": "Storms, Tornados, Floods & Winds",
+    "thunder shower with strong wind": "Storms, Tornados, Floods & Winds",
+    "thunderstorm": "Storms, Tornados, Floods & Winds",
+    "thunderstorm advisory": "Storms, Tornados, Floods & Winds",
+    "thunderstorm gale": "Storms, Tornados, Floods & Winds",
+    "thunderstorm warning": "Storms, Tornados, Floods & Winds",
+    "thunderstorm watch": "Storms, Tornados, Floods & Winds",
+    "thunderstorm with lightning": "Storms, Tornados, Floods & Winds",
+    "thunderstorm yellow": "Storms, Tornados, Floods & Winds",
+    "thunderstorms": "Storms, Tornados, Floods & Winds",
+    "thunderstorms with hail": "Storms, Tornados, Floods & Winds",
+    "tormenta de polvo": "Storms, Tornados, Floods & Winds",
+    "tormenta eléctrica y lluvias": "Storms, Tornados, Floods & Winds",
+    "tormentas": "Storms, Tornados, Floods & Winds",
+    "tornado": "Storms, Tornados, Floods & Winds",
+    "tornado advisory": "Storms, Tornados, Floods & Winds",
+    "tornado warning": "Storms, Tornados, Floods & Winds",
+    "tornado watch": "Storms, Tornados, Floods & Winds",
+    "tropical cyclone": "Storms, Tornados, Floods & Winds",
+    "tropical cyclone statement": "Storms, Tornados, Floods & Winds",
+    "tropical cyclone warning": "Storms, Tornados, Floods & Winds",
+    "tropical cyclone watch": "Storms, Tornados, Floods & Winds",
+    "tropical storm": "Storms, Tornados, Floods & Winds",
+    "tropical storm warning": "Storms, Tornados, Floods & Winds",
+    "tropical storm watch": "Storms, Tornados, Floods & Winds",
+    "tuulivaroitus maa-alueille": "Storms, Tornados, Floods & Winds",
+    "tuulivaroitus merelle": "Storms, Tornados, Floods & Winds",
+    "upepo mkali": "Storms, Tornados, Floods & Winds",
+    "vent": "Storms, Tornados, Floods & Winds",
+    "vent de sable": "Storms, Tornados, Floods & Winds",
+    "vent violent": "Storms, Tornados, Floods & Winds",
+    "viento": "Storms, Tornados, Floods & Winds",
+    "viento fuerte": "Storms, Tornados, Floods & Winds",
+    "viento moderado": "Storms, Tornados, Floods & Winds",
+    "vigilance jaune orages": "Storms, Tornados, Floods & Winds",
+    "weather update for 24-48 hrs": "Storms, Tornados, Floods & Winds",
+    "wind": "Storms, Tornados, Floods & Winds",
+    "wind advisory": "Storms, Tornados, Floods & Winds",
+    "wind level 1": "Storms, Tornados, Floods & Winds",
+    "wind level 2": "Storms, Tornados, Floods & Winds",
+    "wind level 3": "Storms, Tornados, Floods & Winds",
+    "wind level 4": "Storms, Tornados, Floods & Winds",
+    "wind level 5": "Storms, Tornados, Floods & Winds",
+    "wind level 6": "Storms, Tornados, Floods & Winds",
+    "wind levels": "Storms, Tornados, Floods & Winds",
+    "wind statement": "Storms, Tornados, Floods & Winds",
+    "wind warning": "Storms, Tornados, Floods & Winds",
+    "wind watch": "Storms, Tornados, Floods & Winds",
+    "windy": "Storms, Tornados, Floods & Winds",
+    "yellow rain": "Storms, Tornados, Floods & Winds",
+    "yellow thunderstorm advisory": "Storms, Tornados, Floods & Winds",
+    "yellow thunderstorm statement": "Storms, Tornados, Floods & Winds",
+    "yellow thunderstorm warning": "Storms, Tornados, Floods & Winds",
+    "yellow thunderstorm watch": "Storms, Tornados, Floods & Winds",
+    "yellow wind warning": "Storms, Tornados, Floods & Winds",
+    "žuto upozorenje za grmljavinsku oluju": "Storms, Tornados, Floods & Winds",
+    "žuto upozorenje za vjetar": "Storms, Tornados, Floods & Winds",
+    "ветер": "Storms, Tornados, Floods & Winds",
+    "гроза": "Storms, Tornados, Floods & Winds",
+    "дождь": "Storms, Tornados, Floods & Winds",
+    "наводнение": "Storms, Tornados, Floods & Winds",
+    "пыльная (песчаная) буря": "Storms, Tornados, Floods & Winds",
+    "افزایش سرعت وزش باد و افزایش ارتفاع امواج دریا": "Storms, Tornados, Floods & Winds",
+    "رگبار باران، رعد و برق، وزش باد شدید موقت، برخی نقاط گردوخاک، در مناطق مستعد تگرگ": "Storms, Tornados, Floods & Winds",
+    "رياح قوية السرعة وأمواج عالية": "Storms, Tornados, Floods & Winds",
+    "水庫放流": "Storms, Tornados, Floods & Winds",
+    "暴雨警告": "Storms, Tornados, Floods & Winds",
+    "強風": "Storms, Tornados, Floods & Winds",
+    "強烈季候風信號": "Storms, Tornados, Floods & Winds",
+    "雷暴警告": "Storms, Tornados, Floods & Winds",
+    "熱帶氣旋": "Storms, Tornados, Floods & Winds",
+
+    # === TEMPERATURE EXTREMES & WINTER ===
+    "aviso de temperaturas máximas de nivel amarillo": "Temperature Extremes & Winter",
+    "awareness_type=2, awareness_level=1": "Temperature Extremes & Winter",
+    "awareness_type=2, awareness_level=2": "Temperature Extremes & Winter",
+    "awareness_type=2, awareness_level=3": "Temperature Extremes & Winter",
+    "awareness_type=2, awareness_level=4": "Temperature Extremes & Winter",
+    "awareness_type=6, awareness_level=1": "Temperature Extremes & Winter",
+    "awareness_type=6, awareness_level=2": "Temperature Extremes & Winter",
+    "awareness_type=6, awareness_level=3": "Temperature Extremes & Winter",
+    "awareness_type=6, awareness_level=4": "Temperature Extremes & Winter",
+    "awareness_type=7, awareness_level=1": "Temperature Extremes & Winter",
+    "awareness_type=7, awareness_level=2": "Temperature Extremes & Winter",
+    "awareness_type=7, awareness_level=3": "Temperature Extremes & Winter",
+    "awareness_type=7, awareness_level=4": "Temperature Extremes & Winter",
+    "blizzard": "Temperature Extremes & Winter",
+    "blizzard statement": "Temperature Extremes & Winter",
+    "blizzard warning": "Temperature Extremes & Winter",
+    "blizzard watch": "Temperature Extremes & Winter",
+    "chaleur": "Temperature Extremes & Winter",
+    "chaleur extrême": "Temperature Extremes & Winter",
+    "cold": "Temperature Extremes & Winter",
+    "cold advisory": "Temperature Extremes & Winter",
+    "cold statement": "Temperature Extremes & Winter",
+    "cold warning": "Temperature Extremes & Winter",
+    "cold watch": "Temperature Extremes & Winter",
+    "cold wave": "Temperature Extremes & Winter",
+    "excessive heat advisory": "Temperature Extremes & Winter",
+    "excessive heat statement": "Temperature Extremes & Winter",
+    "excessive heat warning": "Temperature Extremes & Winter",
+    "excessive heat watch": "Temperature Extremes & Winter",
+    "extreme cold warning": "Temperature Extremes & Winter",
+    "extreme heat": "Temperature Extremes & Winter",
+    "extreme heat advisory": "Temperature Extremes & Winter",
+    "extreme heat statement": "Temperature Extremes & Winter",
+    "extreme heat warning": "Temperature Extremes & Winter",
+    "extreme heat wave": "Temperature Extremes & Winter",
+    "extreme heat watch": "Temperature Extremes & Winter",
+    "extreme high temp": "Temperature Extremes & Winter",
+    "extreme hot warning": "Temperature Extremes & Winter",
+    "freeze": "Temperature Extremes & Winter",
+    "frost": "Temperature Extremes & Winter",
+    "frost advisory": "Temperature Extremes & Winter",
+    "frost statement": "Temperature Extremes & Winter",
+    "frost warning": "Temperature Extremes & Winter",
+    "frost watch": "Temperature Extremes & Winter",
+    "frosts": "Temperature Extremes & Winter",
+    "geada": "Temperature Extremes & Winter",
+    "gele waarschuwing voor hittegolf": "Temperature Extremes & Winter",
+    "groene waarschuwing voor hittegolf": "Temperature Extremes & Winter",
+    "heat": "Temperature Extremes & Winter",
+    "heat advisory": "Temperature Extremes & Winter",
+    "heat statement": "Temperature Extremes & Winter",
+    "heat warning": "Temperature Extremes & Winter",
+    "heat watch": "Temperature Extremes & Winter",
+    "heat wave": "Temperature Extremes & Winter",
+    "heat wave possible": "Temperature Extremes & Winter",
+    "heat wave warning": "Temperature Extremes & Winter",
+    "heavy snow": "Temperature Extremes & Winter",
+    "heavy snow statement": "Temperature Extremes & Winter",
+    "heavy snow watch": "Temperature Extremes & Winter",
+    "high temp": "Temperature Extremes & Winter",
+    "high temperature": "Temperature Extremes & Winter",
+    "high temperature advisory": "Temperature Extremes & Winter",
+    "high temperature statement": "Temperature Extremes & Winter",
+    "high temperature warning": "Temperature Extremes & Winter",
+    "high temperature watch": "Temperature Extremes & Winter",
+    "high-temperature yellow warning": "Temperature Extremes & Winter",
+    "hitzewarnung": "Temperature Extremes & Winter",
+    "low temperature": "Temperature Extremes & Winter",
+    "low temperature advisory": "Temperature Extremes & Winter",
+    "low temperature statement": "Temperature Extremes & Winter",
+    "low temperature warning": "Temperature Extremes & Winter",
+    "low temperature watch": "Temperature Extremes & Winter",
+    "moderate high-temperature warning": "Temperature Extremes & Winter",
+    "neige": "Temperature Extremes & Winter",
+    "nevadas": "Temperature Extremes & Winter",
+    "nevadas moderadas": "Temperature Extremes & Winter",
+    "schneefall": "Temperature Extremes & Winter",
+    "starke hitze": "Temperature Extremes & Winter",
+    "vigilance jaune canicule": "Temperature Extremes & Winter",
+    "vigilance orange canicule": "Temperature Extremes & Winter",
+    "winter storm advisory": "Temperature Extremes & Winter",
+    "winter storm statement": "Temperature Extremes & Winter",
+    "winter storm warning": "Temperature Extremes & Winter",
+    "winter storm watch": "Temperature Extremes & Winter",
+    "yellow high temperature warning": "Temperature Extremes & Winter",
+    "yellow high-temperature warning": "Temperature Extremes & Winter",
+    "заморозки": "Temperature Extremes & Winter",
+    "очень высокая temperatura": "Temperature Extremes & Winter",
+    "очень низкая температура": "Temperature Extremes & Winter",
+    "高溫": "Temperature Extremes & Winter",
+
+    # === FIRE & SMOKE ===
+    "awareness_type=9, awareness_level=1": "Fire & Smoke",
+    "awareness_type=9, awareness_level=2": "Fire & Smoke",
+    "awareness_type=9, awareness_level=3": "Fire & Smoke",
+    "awareness_type=9, awareness_level=4": "Fire & Smoke",
+    "fire": "Fire & Smoke",
+    "fire warning": "Fire & Smoke",
+    "fire watch": "Fire & Smoke",
+    "fire weather advisory": "Fire & Smoke",
+    "fire weather statement": "Fire & Smoke",
+    "fire weather warning": "Fire & Smoke",
+    "fire weather watch": "Fire & Smoke",
+    "forest fire": "Fire & Smoke",
+    "forestfire": "Fire & Smoke",
+    "incendio (forestal)": "Fire & Smoke",
+    "red flag warning": "Fire & Smoke",
+    "smoke": "Fire & Smoke",
+    "smoke advisory": "Fire & Smoke",
+    "wildfire": "Fire & Smoke",
+    "пожарная опасность": "Fire & Smoke",
+
+    # === EARTHQUAKE, TSUNAMI & VOLCANO ===
+    "avalanche": "Earthquake, Tsunami & Volcano",
+    "awareness_type=10, awareness_level=1": "Earthquake, Tsunami & Volcano",
+    "awareness_type=10, awareness_level=2": "Earthquake, Tsunami & Volcano",
+    "awareness_type=10, awareness_level=3": "Earthquake, Tsunami & Volcano",
+    "awareness_type=10, awareness_level=4": "Earthquake, Tsunami & Volcano",
+    "debris flow": "Earthquake, Tsunami & Volcano",
+    "derrumbe": "Earthquake, Tsunami & Volcano",
+    "earthquake": "Earthquake, Tsunami & Volcano",
+    "earthquake warning": "Earthquake, Tsunami & Volcano",
+    "earthquakes": "Earthquake, Tsunami & Volcano",
+    "fels- und bergsturz, erdrutsch": "Earthquake, Tsunami & Volcano",
+    "gempabumi": "Earthquake, Tsunami & Volcano",
+    "great sitkin volcano volcanic unrest": "Earthquake, Tsunami & Volcano",
+    "kilauea volcano volcanic_activity update": "Earthquake, Tsunami & Volcano",
+    "lahar": "Earthquake, Tsunami & Volcano",
+    "meteorological risk of geological disasters": "Earthquake, Tsunami & Volcano",
+    "mudflow": "Earthquake, Tsunami & Volcano",
+    "mudflow alert": "Earthquake, Tsunami & Volcano",
+    "mudflow warning": "Earthquake, Tsunami & Volcano",
+    "mudslide": "Earthquake, Tsunami & Volcano",
+    "rock and mountain avalanche, landslide": "Earthquake, Tsunami & Volcano",
+    "seismic": "Earthquake, Tsunami & Volcano",
+    "seismic activity": "Earthquake, Tsunami & Volcano",
+    "tsunami": "Earthquake, Tsunami & Volcano",
+    "tsunami warning": "Earthquake, Tsunami & Volcano",
+    "tsunamis": "Earthquake, Tsunami & Volcano",
+    "volcanic activity": "Earthquake, Tsunami & Volcano",
+    "предупреждение о селях": "Earthquake, Tsunami & Volcano",
+    "сель": "Earthquake, Tsunami & Volcano",
+    "селевая опасность": "Earthquake, Tsunami & Volcano",
+
+    # === MARINE & COASTAL ===
+    "aallokkovaroitus": "Marine & Coastal",
+    "awareness_type=8, awareness_level=1": "Marine & Coastal",
+    "awareness_type=8, awareness_level=2": "Marine & Coastal",
+    "awareness_type=8, awareness_level=3": "Marine & Coastal",
+    "awareness_type=8, awareness_level=4": "Marine & Coastal",
+    "beach hazards statement": "Marine & Coastal",
+    "coastal flood advisory": "Marine & Coastal",
+    "coastal flood statement": "Marine & Coastal",
+    "coastal flood warning": "Marine & Coastal",
+    "coastal flood watch": "Marine & Coastal",
+    "hazardous seas warning": "Marine & Coastal",
+    "mar de fondo": "Marine & Coastal",
+    "marine warning": "Marine & Coastal",
+    "marine weather advisory": "Marine & Coastal",
+    "marine weather statement": "Marine & Coastal",
+    "marine weather warning": "Marine & Coastal",
+    "marine weather watch": "Marine & Coastal",
+    "oleaje": "Marine & Coastal",
+    "high surf advisory": "Marine & Coastal",
+    "rip current advisory": "Marine & Coastal",
+    "rip current statement": "Marine & Coastal",
+    "rip current warning": "Marine & Coastal",
+    "rip current watch": "Marine & Coastal",
+    "small craft": "Marine & Coastal",
+    "small craft advisory": "Marine & Coastal",
+    "small craft warning": "Marine & Coastal",
+    "small craft watch": "Marine & Coastal",
+    "storm surge": "Marine & Coastal",
+    "stormsurge advisory": "Marine & Coastal",
+    "strong wind and large waves advisory": "Marine & Coastal",
+    "風暴潮警告": "Marine & Coastal",
+
+    # === AGRICULTURAL & ENVIRONMENTAL ===
+    "air quality": "Agricultural & Environmental",
+    "air quality advisory": "Agricultural & Environmental",
+    "air quality alert": "Agricultural & Environmental",
+    "air quality statement": "Agricultural & Environmental",
+    "air quality warning": "Agricultural & Environmental",
+    "air quality watch": "Agricultural & Environmental",
+    "blight": "Agricultural & Environmental",
+    "blight alert": "Agricultural & Environmental",
+    "drought": "Agricultural & Environmental",
+    "drought advisory": "Agricultural & Environmental",
+    "sheep grazier warning": "Agricultural & Environmental",
+    "uv-tiedote": "Agricultural & Environmental",
+    "water restrictions": "Agricultural & Environmental",
+
+    # === EMERGENCY & CIVIL DEFENSE ===
+    "chemical": "Emergency & Civil Defense",
+    "civil defense": "Emergency & Civil Defense",
+    "civil protection": "Emergency & Civil Defense",
+    "emergency alert": "Emergency & Civil Defense",
+    "emergency evacuation": "Emergency & Civil Defense",
+    "evacuation": "Emergency & Civil Defense",
+    "evacuation immediate": "Emergency & Civil Defense",
+    "evacuation warning": "Emergency & Civil Defense",
+    "gefahrenmitteilung": "Emergency & Civil Defense",
+    "grossveranstaltung": "Emergency & Civil Defense",
+    "local area emergency": "Emergency & Civil Defense",
+    "local emergency": "Emergency & Civil Defense",
+    "local evacuation": "Emergency & Civil Defense",
+    "shelter in place": "Emergency & Civil Defense",
+    "消防安全檢查重大不合格場所": "Emergency & Civil Defense",
+
+    # === TEST & EXERCISE ===
+    "drill": "Test & Exercise",
+    "exercice": "Test & Exercise",
+    "exercise": "Test & Exercise",
+    "required monthly eas test": "Test & Exercise",
+    "required weekly eas test": "Test & Exercise",
+    "required weekly test": "Test & Exercise",
+    "test": "Test & Exercise",
+    "test & exercise": "Test & Exercise",
+    "test alert": "Test & Exercise",
+    "test message": "Test & Exercise",
+    "tests": "Test & Exercise",
+
+    # === MISC ===
+    "anderes ereignis": "Misc",
+    "gefahreninformation": "Misc",
+    "misc": "Misc",
+    "no text": "Misc",
+    "other": "Misc",
+    "other danger": "Misc",
+    "other dangers": "Misc",
+    "other hazard": "Misc",
+    "other hazards": "Misc",
+    "others": "Misc",
+    "special weather statement": "Misc",
+    "weather": "Misc",
+    "yellow warning": "Misc",
+    "прочие опасности": "Misc",
+}
+        
+    category_folders = {}
+
+    for item in cached_alerts:
+        kml_color = get_kml_color(item["severity"])
+        center_lon, center_lat = calculate_centroid(item["coords"])
+        
+        # Clean up whitespace and force text representation safely
+        raw_event = str(item.get("event_type", "Alert")).strip()
+        lookup_event = raw_event.lower()
+        
+        # Safe string handling using Python's native .title() method directly inside assignments
+        specific_alert_name = raw_event.title() if raw_event else "Active Alert"
+        
+        # Look up the broad category name folder safely with fallback values
+        if lookup_event in CATEGORY_MAPPING:
+            category_name = CATEGORY_MAPPING[lookup_event]
+        else:
+            category_name = specific_alert_name
+        
+        # Create the category folder if it doesn't exist yet
+        if category_name not in category_folders:
+            category_folders[category_name] = kml.newfolder(name=category_name)
+        
+        target_folder = category_folders[category_name]
+        
+        cap_data_url = f"{API_BASE_URL}/alert/{item['id']}"
+        
+        # Format the HTML popup content safely using .get dictionary defaults
+        popup_content = f"""
+        <h3>{item.get("title", "Active Alert")}</h3>
+        <p><b>Severity:</b> {str(item.get("severity", "Unknown")).upper()}</p>
+        <hr/>
+        <p>{item.get("description", "No description provided.")}</p>
+        <hr/>
+        <p style="font-size: 11px; color: #555555;">
+            <b>Sources:</b><br/>
+            <a href="{cap_data_url}">View CAP JSON Data</a>
+        </p>
+        """
+
+        # Micro-Zoom Regions to hide labels from space
+        reg = simplekml.Region()
+        reg.latlonaltbox.north = center_lat + 0.01
+        reg.latlonaltbox.south = center_lat - 0.01
+        reg.latlonaltbox.east = center_lon + 0.01
+        reg.latlonaltbox.west = center_lon - 0.01
+        reg.lod.minlod = 24  
+        reg.lod.maxlod = -1
+
+        # --- POLYGON GENERATION ---
+        if len(item["coords"]) > 1:
+            pol = target_folder.newpolygon(outerboundaryis=item["coords"])
+            pol.description = popup_content
+            pol.style.polystyle.color = kml_color
+            pol.style.linestyle.color = kml_color
+            pol.style.balloonstyle.text = "$[description]"
+            pol.style.balloonstyle.bgcolor = "ffffffff"
+
+        # --- PIN GENERATION ---
+        pin = target_folder.newpoint(name=specific_alert_name, coords=[(center_lon, center_lat)])
+        pin.description = popup_content
+        pin.region = reg
+        
+        # Dynamic StyleMap for scaling when zoomed in
+        style_map = simplekml.StyleMap()
+        style_map.normalstyle.iconstyle.color = kml_color
+        style_map.normalstyle.iconstyle.scale = 0.9
+        style_map.normalstyle.labelstyle.scale = 0.8  
+        
+        style_map.highlightstyle.iconstyle.color = kml_color
+        style_map.highlightstyle.iconstyle.scale = 1.1
+        style_map.highlightstyle.labelstyle.scale = 1.0 
+        
+        pin.stylemap = style_map
+        pin.style.balloonstyle.text = "$[description]"
+        pin.style.balloonstyle.bgcolor = "ffffffff"
+        
+    return Response(kml.kml(), mimetype='application/vnd.google-earth.kml+xml')
+
+if __name__ == "__main__":
+    worker = threading.Thread(target=background_alert_harvester, daemon=True)
+    worker.start()
+    
+    # Changing host to '0.0.0.0' opens the server up to your local network
+    print("Starting KML Presenter server on local network...", flush=True)
+    app.run(host='0.0.0.0', port=5000)

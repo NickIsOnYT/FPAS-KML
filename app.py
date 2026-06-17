@@ -1,3 +1,4 @@
+# app.py
 from flask import Flask, Response
 import requests
 import simplekml
@@ -6,6 +7,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 import time
 import sys
+
+# Import the translation map from our new external translations module
+from translations import CATEGORY_MAPPING
 
 app = Flask(__name__)
 API_BASE_URL = "https://alerts.kde.org"
@@ -67,7 +71,7 @@ def fetch_single_alert(alert_id):
         if coords:
             return alert_id, {
                 "id": alert_id,
-                "event_type": event, # "Severe Thunderstorm", "Flood", etc.
+                "event_type": event,
                 "title": f"{event} - {area_desc}",
                 "severity": info.findtext('{*}severity', 'Unknown'),
                 "description": info.findtext('{*}description', 'No description.'),
@@ -134,18 +138,43 @@ def serve_kml():
     with cache_lock:
         cached_alerts = list(ALERT_CACHE.values())
         
+    category_folders = {}
+    subcategory_folders = {}
+
     for item in cached_alerts:
         kml_color = get_kml_color(item["severity"])
         center_lon, center_lat = calculate_centroid(item["coords"])
         
+        raw_event = str(item.get("event_type", "Alert")).strip()
+        lookup_event = raw_event.lower()
+        
+        specific_alert_name = raw_event.title() if raw_event else "Active Alert"
+        
+        if lookup_event in CATEGORY_MAPPING:
+            category_name = CATEGORY_MAPPING[lookup_event]
+        else:
+            category_name = specific_alert_name
+        
+        # 1. Broad Category Folder Assignment
+        if category_name not in category_folders:
+            category_folders[category_name] = kml.newfolder(name=category_name)
+        
+        parent_folder = category_folders[category_name]
+        
+        # 2. Nested Sub-folder Assignment
+        sub_folder_key = (category_name, specific_alert_name)
+        if sub_folder_key not in subcategory_folders:
+            subcategory_folders[sub_folder_key] = parent_folder.newfolder(name=specific_alert_name)
+            
+        target_folder = subcategory_folders[sub_folder_key]
+        
         cap_data_url = f"{API_BASE_URL}/alert/{item['id']}"
         
-        # Balloon Popup layout contains full detailed name and metadata links
         popup_content = f"""
-        <h3>{item["title"]}</h3>
-        <p><b>Severity:</b> {item["severity"].upper()}</p>
+        <h3>{item.get("title", "Active Alert")}</h3>
+        <p><b>Severity:</b> {str(item.get("severity", "Unknown")).upper()}</p>
         <hr/>
-        <p>{item["description"]}</p>
+        <p>{item.get("description", "No description provided.")}</p>
         <hr/>
         <p style="font-size: 11px; color: #555555;">
             <b>Sources:</b><br/>
@@ -153,9 +182,6 @@ def serve_kml():
         </p>
         """
 
-        # --- MICROSCOPIC ZOOM REGION ---
-        # Forces the floating text and pin to vanish from space, 
-        # activating only when close to the center point.
         reg = simplekml.Region()
         reg.latlonaltbox.north = center_lat + 0.01
         reg.latlonaltbox.south = center_lat - 0.01
@@ -166,8 +192,7 @@ def serve_kml():
 
         # --- POLYGON GENERATION ---
         if len(item["coords"]) > 1:
-            # We don't name polygons so they never try to display text on the map
-            pol = kml.newpolygon(outerboundaryis=item["coords"])
+            pol = target_folder.newpolygon(outerboundaryis=item["coords"])
             pol.description = popup_content
             pol.style.polystyle.color = kml_color
             pol.style.linestyle.color = kml_color
@@ -175,16 +200,14 @@ def serve_kml():
             pol.style.balloonstyle.bgcolor = "ffffffff"
 
         # --- PIN GENERATION ---
-        # The map label uses ONLY the short alert type (e.g. "Flood")
-        pin = kml.newpoint(name=item["event_type"], coords=[(center_lon, center_lat)])
+        pin = target_folder.newpoint(name=specific_alert_name, coords=[(center_lon, center_lat)])
         pin.description = popup_content
         pin.region = reg
         
-        # Dynamic StyleMap for a polished, readable text look when zoomed in
         style_map = simplekml.StyleMap()
         style_map.normalstyle.iconstyle.color = kml_color
         style_map.normalstyle.iconstyle.scale = 0.9
-        style_map.normalstyle.labelstyle.scale = 0.8  # Shrunk down text labels for clarity
+        style_map.normalstyle.labelstyle.scale = 0.8  
         
         style_map.highlightstyle.iconstyle.color = kml_color
         style_map.highlightstyle.iconstyle.scale = 1.1
@@ -200,6 +223,5 @@ if __name__ == "__main__":
     worker = threading.Thread(target=background_alert_harvester, daemon=True)
     worker.start()
     
-    # Changing host to '0.0.0.0' opens the server up to your local network
     print("Starting KML Presenter server on local network...", flush=True)
     app.run(host='0.0.0.0', port=5000)

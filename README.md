@@ -32,7 +32,7 @@ python app.py
 
 - Wait for the events to parse
 
-- add `localhost:5000/alerts.kml` to your Google Earth network links (Add -> Network Link), or open the .kml file.
+- add `http://localhost:5000/alerts.kml` to your Google Earth network links (Add -> Network Link), or open the .kml file.
 
 - if you want to use the computer you installed this on as a server for the program, please do these steps. otherwise, ignore this.
 
