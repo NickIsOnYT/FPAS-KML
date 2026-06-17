@@ -28,7 +28,8 @@ def get_kml_color(severity, alpha=150):
     else: base_color = 'ffffff'
     return alpha_hex + base_color
 
-def calculate_centroid(coords):
+def calculate_single_polygon_centroid(coords):
+    """Calculates the geometric center for a single coordinate array branch."""
     if not coords:
         return (0.0, 0.0)
     unique_coords = list(set(coords))
@@ -42,40 +43,64 @@ def fetch_single_alert(alert_id):
         if r.status_code != 200: return alert_id, None
         
         root = ET.fromstring(r.content)
-        info = root.find('.//{*}info')
-        if info is None: return alert_id, None
+        
+        info_main = root.find('.//{*}info')
+        if info_main is None: return alert_id, None
 
-        event = info.findtext('{*}event', 'Alert')
-        area = info.find('{*}area')
+        # Fallback fields if language-specific blocks are missing items
+        event = info_main.findtext('{*}event', 'Alert')
+        severity = info_main.findtext('{*}severity', 'Unknown')
         
-        coords = []
-        area_desc = "Unknown Location"
+        geometries = []
         
-        if area is not None:
-            area_desc = area.findtext('{*}areaDesc') or "Unknown Location"
-            poly_node = area.find('{*}polygon')
-            circle_node = area.find('{*}circle')
+        # Traverse through each distinct language info block separately
+        for info_block in root.findall('.//{*}info'):
+            lang = info_block.findtext('{*}language', 'en-CA')
+            local_event = info_block.findtext('{*}event', event)
+            local_description = info_block.findtext('{*}description', 'No description.')
             
-            if poly_node is not None and poly_node.text:
-                for pair in poly_node.text.split(): 
-                    if ',' in pair:
-                        lat, lon = pair.split(',')
-                        coords.append((float(lon), float(lat)))
-            
-            elif circle_node is not None and circle_node.text:
-                parts = circle_node.text.split()
-                if parts:
-                    lat, lon = parts[0].split(',')
-                    coords.append((float(lon), float(lat)))
+            for area in info_block.findall('{*}area'):
+                area_desc = area.findtext('{*}areaDesc', 'Unknown Location')
+                
+                # Process polygons for this specific language element
+                for poly_node in area.findall('{*}polygon'):
+                    if poly_node.text:
+                        current_poly_coords = []
+                        for pair in poly_node.text.split(): 
+                            if ',' in pair:
+                                lat, lon = pair.split(',')
+                                current_poly_coords.append((float(lon), float(lat)))
+                        if current_poly_coords:
+                            geometries.append({
+                                "type": "polygon",
+                                "language": lang,
+                                "event_title": local_event,
+                                "location_name": area_desc,
+                                "description": local_description,
+                                "coords": current_poly_coords
+                            })
+                
+                # Process circles for this specific language element
+                for circle_node in area.findall('{*}circle'):
+                    if circle_node.text:
+                        parts = circle_node.text.split()
+                        if parts:
+                            lat, lon = parts[0].split(',')
+                            geometries.append({
+                                "type": "circle",
+                                "language": lang,
+                                "event_title": local_event,
+                                "location_name": area_desc,
+                                "description": local_description,
+                                "coords": [(float(lon), float(lat))]
+                            })
         
-        if coords:
+        if geometries:
             return alert_id, {
                 "id": alert_id,
                 "event_type": event,
-                "title": f"{event} - {area_desc}",
-                "severity": info.findtext('{*}severity', 'Unknown'),
-                "description": info.findtext('{*}description', 'No description.'),
-                "coords": coords
+                "severity": severity,
+                "geometries": geometries
             }
     except Exception:
         pass
@@ -143,11 +168,8 @@ def serve_kml():
 
     for item in cached_alerts:
         kml_color = get_kml_color(item["severity"])
-        center_lon, center_lat = calculate_centroid(item["coords"])
-        
         raw_event = str(item.get("event_type", "Alert")).strip()
         lookup_event = raw_event.lower()
-        
         specific_alert_name = raw_event.title() if raw_event else "Active Alert"
         
         if lookup_event in CATEGORY_MAPPING:
@@ -155,67 +177,81 @@ def serve_kml():
         else:
             category_name = specific_alert_name
         
-        # 1. Broad Category Folder Assignment
         if category_name not in category_folders:
             category_folders[category_name] = kml.newfolder(name=category_name)
         
         parent_folder = category_folders[category_name]
         
-        # 2. Nested Sub-folder Assignment
         sub_folder_key = (category_name, specific_alert_name)
         if sub_folder_key not in subcategory_folders:
             subcategory_folders[sub_folder_key] = parent_folder.newfolder(name=specific_alert_name)
             
         target_folder = subcategory_folders[sub_folder_key]
-        
         cap_data_url = f"{API_BASE_URL}/alert/{item['id']}"
-        
-        popup_content = f"""
-        <h3>{item.get("title", "Active Alert")}</h3>
-        <p><b>Severity:</b> {str(item.get("severity", "Unknown")).upper()}</p>
-        <hr/>
-        <p>{item.get("description", "No description provided.")}</p>
-        <hr/>
-        <p style="font-size: 11px; color: #555555;">
-            <b>Sources:</b><br/>
-            <a href="{cap_data_url}">View CAP JSON Data</a>
-        </p>
-        """
 
-        reg = simplekml.Region()
-        reg.latlonaltbox.north = center_lat + 0.01
-        reg.latlonaltbox.south = center_lat - 0.01
-        reg.latlonaltbox.east = center_lon + 0.01
-        reg.latlonaltbox.west = center_lon - 0.01
-        reg.lod.minlod = 24  
-        reg.lod.maxlod = -1
+        # Global checklist per alert tracking unique geometry bounds rendered to prevent duplicate shapes
+        rendered_polygon_fingerprints = set()
 
-        # --- POLYGON GENERATION ---
-        if len(item["coords"]) > 1:
-            pol = target_folder.newpolygon(outerboundaryis=item["coords"])
-            pol.description = popup_content
-            pol.style.polystyle.color = kml_color
-            pol.style.linestyle.color = kml_color
-            pol.style.balloonstyle.text = "$[description]"
-            pol.style.balloonstyle.bgcolor = "ffffffff"
+        for geom in item.get("geometries", []):
+            event_title = geom.get("event_title", specific_alert_name).title()
+            
+            # Use localized title block combinations inside the pop-up balloon info window
+            popup_header = f"{event_title} - {geom['location_name']}"
+            
+            popup_content = f"""
+            <h3>{popup_header}</h3>
+            <p><b>Severity:</b> {str(item.get("severity", "Unknown")).upper()}</p>
+            <hr/>
+            <p>{geom['description']}</p>
+            <hr/>
+            <p style="font-size: 11px; color: #555555;">
+                <b>Sources:</b><br/>
+                <a href="{cap_data_url}">View CAP JSON Data</a>
+            </p>
+            """
+            
+            center_lon, center_lat = calculate_single_polygon_centroid(geom["coords"])
+            
+            # --- DUP-CHECKING PHYSICAL SHAPES ---
+            if geom["type"] == "polygon" and len(geom["coords"]) > 1:
+                # Create a spatial fingerprint hash string out of the coordinate bound values
+                geo_fingerprint = f"{geom['coords'][0][0]},{geom['coords'][0][1]}_{geom['coords'][-1][0]},{geom['coords'][-1][1]}_{len(geom['coords'])}"
+                
+                if geo_fingerprint not in rendered_polygon_fingerprints:
+                    pol = target_folder.newpolygon(name=event_title, outerboundaryis=geom["coords"])
+                    pol.description = popup_content
+                    pol.style.polystyle.color = kml_color
+                    pol.style.linestyle.color = kml_color
+                    pol.style.balloonstyle.text = "$[description]"
+                    pol.style.balloonstyle.bgcolor = "ffffffff"
+                    
+                    rendered_polygon_fingerprints.add(geo_fingerprint)
+                
+            # --- RENDER LOCALIZED MULTI-LINGUAL TRACKING PINS ---
+            reg = simplekml.Region()
+            reg.latlonaltbox.north = center_lat + 0.01
+            reg.latlonaltbox.south = center_lat - 0.01
+            reg.latlonaltbox.east = center_lon + 0.01
+            reg.latlonaltbox.west = center_lon - 0.01
+            reg.lod.minlod = 24  
+            reg.lod.maxlod = -1
 
-        # --- PIN GENERATION ---
-        pin = target_folder.newpoint(name=specific_alert_name, coords=[(center_lon, center_lat)])
-        pin.description = popup_content
-        pin.region = reg
-        
-        style_map = simplekml.StyleMap()
-        style_map.normalstyle.iconstyle.color = kml_color
-        style_map.normalstyle.iconstyle.scale = 0.9
-        style_map.normalstyle.labelstyle.scale = 0.8  
-        
-        style_map.highlightstyle.iconstyle.color = kml_color
-        style_map.highlightstyle.iconstyle.scale = 1.1
-        style_map.highlightstyle.labelstyle.scale = 1.0 
-        
-        pin.stylemap = style_map
-        pin.style.balloonstyle.text = "$[description]"
-        pin.style.balloonstyle.bgcolor = "ffffffff"
+            pin = target_folder.newpoint(name=event_title, coords=[(center_lon, center_lat)])
+            pin.description = popup_content
+            pin.region = reg
+            
+            style_map = simplekml.StyleMap()
+            style_map.normalstyle.iconstyle.color = kml_color
+            style_map.normalstyle.iconstyle.scale = 0.9
+            style_map.normalstyle.labelstyle.scale = 0.8  
+            
+            style_map.highlightstyle.iconstyle.color = kml_color
+            style_map.highlightstyle.iconstyle.scale = 1.1
+            style_map.highlightstyle.labelstyle.scale = 1.0 
+            
+            pin.stylemap = style_map
+            pin.style.balloonstyle.text = "$[description]"
+            pin.style.balloonstyle.bgcolor = "ffffffff"
         
     return Response(kml.kml(), mimetype='application/vnd.google-earth.kml+xml')
 
