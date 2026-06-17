@@ -132,7 +132,7 @@ def background_alert_harvester():
 
 @app.route('/alerts.kml')
 def serve_kml():
-    print(f"Google Earth requested map. Serving {len(ALERT_CACHE)} alerts from local memory instantly!", flush=True)
+    print(f"Request detected, Serving {len(ALERT_CACHE)} alerts from local memory.", flush=True)
     kml = simplekml.Kml()
     
     with cache_lock:
@@ -224,4 +224,5 @@ if __name__ == "__main__":
     worker.start()
     
     print("Starting KML Presenter server on local network...", flush=True)
+    print("Google Earth url: http:ip-address:5000/alerts.kml", flush=True)
     app.run(host='0.0.0.0', port=5000)

@@ -216,6 +216,12 @@ CATEGORY_MAPPING = {
     "強烈季候風信號": "Storms, Tornados, Floods & Winds",
     "雷暴警告": "Storms, Tornados, Floods & Winds",
     "熱帶氣旋": "Storms, Tornados, Floods & Winds",
+    "lakeshore flood warning": "Storms, Tornados, Floods & Winds",
+    "moderate rain": "Storms, Tornados, Floods & Winds",
+    "probables tormentas eléctricas": "Storms, Tornados, Floods & Winds",
+    "dust advisory": "Storms, Tornados, Floods & Winds",
+    "starkes gewitter": "Storms, Tornados, Floods & Winds",
+    "very heavy rain": "Storms, Tornados, Floods & Winds",
 
     # === TEMPERATURE EXTREMES & WINTER ===
     "aviso de temperaturas máximas de nivel amarillo": "Temperature Extremes & Winter",
@@ -311,6 +317,7 @@ CATEGORY_MAPPING = {
     "очень высокая температура": "Temperature Extremes & Winter",
     "очень низкая температура": "Temperature Extremes & Winter",
     "高溫": "Temperature Extremes & Winter",
+    "probables nevadas": "Temperature Extremes & Winter",
 
     # === FIRE & SMOKE ===
     "awareness_type=9, awareness_level=1": "Fire & Smoke",
@@ -332,6 +339,7 @@ CATEGORY_MAPPING = {
     "smoke advisory": "Fire & Smoke",
     "wildfire": "Fire & Smoke",
     "пожарная опасность": "Fire & Smoke",
+    "structure fire": "Fire & Smoke",
 
     # === EARTHQUAKE, TSUNAMI & VOLCANO ===
     "avalanche": "Earthquake, Tsunami & Volcano",
@@ -400,6 +408,7 @@ CATEGORY_MAPPING = {
     "strong wind and large waves advisory": "Marine & Coastal",
     "海洋污染": "Marine & Coastal",
     "風暴潮警告": "Marine & Coastal",
+    "low water advisory": "Marine & Coastal",
 
     # === AGRICULTURAL & ENVIRONMENTAL ===
     "air quality": "Agricultural & Environmental",
@@ -416,6 +425,8 @@ CATEGORY_MAPPING = {
     "sheep grazier warning": "Agricultural & Environmental",
     "uv-tiedote": "Agricultural & Environmental",
     "water restrictions": "Agricultural & Environmental",
+    "particle pollution": "Agricultural & Environmental",
+    "healt advisory": "Agricultural & Environmental",
 
     # === EMERGENCY & CIVIL DEFENSE ===
     "chemical": "Emergency & Civil Defense",
@@ -464,4 +475,6 @@ CATEGORY_MAPPING = {
     "weather": "Misc",
     "yellow warning": "Misc",
     "прочие опасности": "Misc",
+    "issue": "Misc",
+    "update": "Misc",
 }
