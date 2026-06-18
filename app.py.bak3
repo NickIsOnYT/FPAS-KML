@@ -47,11 +47,13 @@ def fetch_single_alert(alert_id):
         info_main = root.find('.//{*}info')
         if info_main is None: return alert_id, None
 
+        # Fallback fields if language-specific blocks are missing items
         event = info_main.findtext('{*}event', 'Alert')
         severity = info_main.findtext('{*}severity', 'Unknown')
         
         geometries = []
         
+        # Traverse through each distinct language info block separately
         for info_block in root.findall('.//{*}info'):
             lang = info_block.findtext('{*}language', 'en-CA')
             local_event = info_block.findtext('{*}event', event)
@@ -60,6 +62,7 @@ def fetch_single_alert(alert_id):
             for area in info_block.findall('{*}area'):
                 area_desc = area.findtext('{*}areaDesc', 'Unknown Location')
                 
+                # Process polygons for this specific language element
                 for poly_node in area.findall('{*}polygon'):
                     if poly_node.text:
                         current_poly_coords = []
@@ -77,6 +80,7 @@ def fetch_single_alert(alert_id):
                                 "coords": current_poly_coords
                             })
                 
+                # Process circles for this specific language element
                 for circle_node in area.findall('{*}circle'):
                     if circle_node.text:
                         parts = circle_node.text.split()
@@ -185,97 +189,54 @@ def serve_kml():
         target_folder = subcategory_folders[sub_folder_key]
         cap_data_url = f"{API_BASE_URL}/alert/{item['id']}"
 
+        # Global checklist per alert tracking unique geometry bounds rendered to prevent duplicate shapes
         rendered_polygon_fingerprints = set()
-        
-        # Dictionary to bundle distinct localized pins sharing the exact same coordinate node
-        # Structure: {(lon, lat): [geom1, geom2]}
-        pin_aggregation = {}
 
         for geom in item.get("geometries", []):
             event_title = geom.get("event_title", specific_alert_name).title()
-            center_lon, center_lat = calculate_single_polygon_centroid(geom["coords"])
-            coord_key = (round(center_lon, 5), round(center_lat, 5))
-
-            # --- DUP-CHECKING PHYSICAL SHAPES (Removes Z-Fighting stack layers) ---
-            if geom["type"] == "polygon" and len(geom["coords"]) > 1:
-                geo_fingerprint = f"{geom['coords'][0][0]},{geom['coords'][0][1]}_{geom['coords'][-1][0]},{geom['coords'][-1][1]}_{len(geom['coords'])}"
-                
-                if geo_fingerprint not in rendered_polygon_fingerprints:
-                    # Layout a clean unified header for the outline container shape
-                    popup_header = f"{event_title} - {geom['location_name']}"
-                    shape_popup = f"""
-                    <h3>{popup_header}</h3>
-                    <p><b>Severity:</b> {str(item.get("severity", "Unknown")).upper()}</p>
-                    <hr/>
-                    <p>{geom['description']}</p>
-                    <hr/>
-                    <p style="font-size: 11px; color: #555555;">
-                        <b>Sources:</b><br/>
-                        <a href="{cap_data_url}">View CAP JSON Data</a>
-                    </p>
-                    """
-                    pol = target_folder.newpolygon(name=event_title, outerboundaryis=geom["coords"])
-                    pol.description = shape_popup
-                    pol.style.polystyle.color = kml_color
-                    pol.style.linestyle.color = kml_color
-                    pol.style.balloonstyle.text = "$[description]"
-                    pol.style.balloonstyle.bgcolor = "ffffffff"
-                    
-                    rendered_polygon_fingerprints.add(geo_fingerprint)
-
-            # --- BUFFER PIN FOR COMBINED PROCESSING ---
-            if coord_key not in pin_aggregation:
-                pin_aggregation[coord_key] = []
-            pin_aggregation[coord_key].append(geom)
-
-        # --- RENDER SMART OPTIMIZED PINS ---
-        for (lon, lat), geoms in pin_aggregation.items():
-            # If multiple nodes match coordinates exactly, compile a bilingual view block
-            if len(geoms) > 1:
-                # Deduplicate matching titles or arrange alternating language texts
-                titles = list(dict.fromkeys([g['event_title'].title() for g in geoms]))
-                pin_display_name = " / ".join(titles)
-                
-                popup_sections = []
-                for g in geoms:
-                    lang_label = "English" if "en" in g['language'].lower() else "Français"
-                    popup_sections.append(f"""
-                        <h4>[{lang_label}] {g['event_title'].title()} - {g['location_name']}</h4>
-                        <p>{g['description']}</p>
-                    """)
-                
-                body_content = "<hr/>".join(popup_sections)
-            else:
-                # Fallback directly to simple layout for solitary pins
-                g = geoms[0]
-                pin_display_name = g['event_title'].title()
-                body_content = f"""
-                    <h4>{g['event_title'].title()} - {g['location_name']}</h4>
-                    <p>{g['description']}</p>
-                """
-
-            # Build the finalized balloon popup payload
+            
+            # Use localized title block combinations inside the pop-up balloon info window
+            popup_header = f"{event_title} - {geom['location_name']}"
+            
             popup_content = f"""
-            <h3>{pin_display_name}</h3>
+            <h3>{popup_header}</h3>
             <p><b>Severity:</b> {str(item.get("severity", "Unknown")).upper()}</p>
             <hr/>
-            {body_content}
+            <p>{geom['description']}</p>
             <hr/>
             <p style="font-size: 11px; color: #555555;">
                 <b>Sources:</b><br/>
                 <a href="{cap_data_url}">View CAP JSON Data</a>
             </p>
             """
-
+            
+            center_lon, center_lat = calculate_single_polygon_centroid(geom["coords"])
+            
+            # --- DUP-CHECKING PHYSICAL SHAPES ---
+            if geom["type"] == "polygon" and len(geom["coords"]) > 1:
+                # Create a spatial fingerprint hash string out of the coordinate bound values
+                geo_fingerprint = f"{geom['coords'][0][0]},{geom['coords'][0][1]}_{geom['coords'][-1][0]},{geom['coords'][-1][1]}_{len(geom['coords'])}"
+                
+                if geo_fingerprint not in rendered_polygon_fingerprints:
+                    pol = target_folder.newpolygon(name=event_title, outerboundaryis=geom["coords"])
+                    pol.description = popup_content
+                    pol.style.polystyle.color = kml_color
+                    pol.style.linestyle.color = kml_color
+                    pol.style.balloonstyle.text = "$[description]"
+                    pol.style.balloonstyle.bgcolor = "ffffffff"
+                    
+                    rendered_polygon_fingerprints.add(geo_fingerprint)
+                
+            # --- RENDER LOCALIZED MULTI-LINGUAL TRACKING PINS ---
             reg = simplekml.Region()
-            reg.latlonaltbox.north = lat + 0.01
-            reg.latlonaltbox.south = lat - 0.01
-            reg.latlonaltbox.east = lon + 0.01
-            reg.latlonaltbox.west = lon - 0.01
+            reg.latlonaltbox.north = center_lat + 0.01
+            reg.latlonaltbox.south = center_lat - 0.01
+            reg.latlonaltbox.east = center_lon + 0.01
+            reg.latlonaltbox.west = center_lon - 0.01
             reg.lod.minlod = 24  
             reg.lod.maxlod = -1
 
-            pin = target_folder.newpoint(name=pin_display_name, coords=[(lon, lat)])
+            pin = target_folder.newpoint(name=event_title, coords=[(center_lon, center_lat)])
             pin.description = popup_content
             pin.region = reg
             

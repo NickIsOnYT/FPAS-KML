@@ -222,6 +222,9 @@ CATEGORY_MAPPING = {
     "dust advisory": "Storms, Tornados, Floods & Winds",
     "starkes gewitter": "Storms, Tornados, Floods & Winds",
     "very heavy rain": "Storms, Tornados, Floods & Winds",
+    "orange thunderstorm warning": "Storms, Tornados, Floods & Winds",
+    "rainstorm warning signal": "Storms, Tornados, Floods & Winds",
+    "severe weather warning": "Storms, Tornados, Floods & Winds",
 
     # === TEMPERATURE EXTREMES & WINTER ===
     "aviso de temperaturas máximas de nivel amarillo": "Temperature Extremes & Winter",
@@ -318,6 +321,9 @@ CATEGORY_MAPPING = {
     "очень низкая температура": "Temperature Extremes & Winter",
     "高溫": "Temperature Extremes & Winter",
     "probables nevadas": "Temperature Extremes & Winter",
+    "vysoké teploty": "Temperature Extremes & Winter",
+    "výstraha pred vysokými teplotami": "Temperature Extremes & Winter",
+    "visoka temperatura - zmerna ogroženost"
 
     # === FIRE & SMOKE ===
     "awareness_type=9, awareness_level=1": "Fire & Smoke",
@@ -445,6 +451,7 @@ CATEGORY_MAPPING = {
     "local evacuation": "Emergency & Civil Defense",
     "shelter in place": "Emergency & Civil Defense",
     "消防安全檢查重大不合格場所": "Emergency & Civil Defense",
+    "鐵路事故": "Emergency & Civil Defense",
 
     # === TEST & EXERCISE ===
     "drill": "Test & Exercise",
