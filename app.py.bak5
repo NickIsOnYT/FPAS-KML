@@ -28,14 +28,11 @@ def get_kml_color(severity, alpha=150):
     else: base_color = 'ffffff'
     return alpha_hex + base_color
 
-def calculate_centroid_from_geometries(geometries):
-    """Calculates a single global geographic center across a list of geometry coordinate blocks."""
-    all_coords = []
-    for geom in geometries:
-        all_coords.extend(geom["coords"])
-    if not all_coords:
+def calculate_single_polygon_centroid(coords):
+    """Calculates the geometric center for a single coordinate array branch."""
+    if not coords:
         return (0.0, 0.0)
-    unique_coords = list(set(all_coords))
+    unique_coords = list(set(coords))
     avg_lon = sum(c[0] for c in unique_coords) / len(unique_coords)
     avg_lat = sum(c[1] for c in unique_coords) / len(unique_coords)
     return (avg_lon, avg_lat)
@@ -190,26 +187,27 @@ def serve_kml():
 
         rendered_polygon_fingerprints = set()
         
-        # Cluster group tracking map using location_name alongside content fields
-        # Key: (event_title, location_name) -> Value: List of geometry matching loops
-        data_groups = {}
+        # Dictionary to bundle distinct localized pins sharing the exact same coordinate node
+        # Structure: {(lon, lat): [geom1, geom2]}
+        pin_aggregation = {}
 
         for geom in item.get("geometries", []):
             event_title = geom.get("event_title", specific_alert_name).title()
-            desc_text = geom.get("description", "No description available.").strip()
-            loc_name = geom.get("location_name", "Unknown Location")
-            
-            # --- DUP-CHECKING PHYSICAL SHAPES (Renders boundaries exactly once) ---
+            center_lon, center_lat = calculate_single_polygon_centroid(geom["coords"])
+            coord_key = (round(center_lon, 5), round(center_lat, 5))
+
+            # --- DUP-CHECKING PHYSICAL SHAPES (Removes Z-Fighting stack layers) ---
             if geom["type"] == "polygon" and len(geom["coords"]) > 1:
                 geo_fingerprint = f"{geom['coords'][0][0]},{geom['coords'][0][1]}_{geom['coords'][-1][0]},{geom['coords'][-1][1]}_{len(geom['coords'])}"
                 
                 if geo_fingerprint not in rendered_polygon_fingerprints:
-                    popup_header = f"{event_title} - {loc_name}"
+                    # Layout a clean unified header for the outline container shape
+                    popup_header = f"{event_title} - {geom['location_name']}"
                     shape_popup = f"""
                     <h3>{popup_header}</h3>
                     <p><b>Severity:</b> {str(item.get("severity", "Unknown")).upper()}</p>
                     <hr/>
-                    <p>{desc_text}</p>
+                    <p>{geom['description']}</p>
                     <hr/>
                     <p style="font-size: 11px; color: #555555;">
                         <b>Sources:</b><br/>
@@ -225,95 +223,74 @@ def serve_kml():
                     
                     rendered_polygon_fingerprints.add(geo_fingerprint)
 
-            # Cluster based on Content AND Location Name to isolate geographical zones cleanly
-            group_key = (event_title, loc_name)
-            if group_key not in data_groups:
-                data_groups[group_key] = []
-            data_groups[group_key].append(geom)
+            # --- BUFFER PIN FOR COMBINED PROCESSING ---
+            if coord_key not in pin_aggregation:
+                pin_aggregation[coord_key] = []
+            pin_aggregation[coord_key].append(geom)
 
-        # --- SMART DEDUPLICATED MULTI-LINGUAL PIN GENERATION ---
-        for (event_title, loc_name), geoms in data_groups.items():
-            en_geoms = [g for g in geoms if 'en' in g['language'].lower()]
-            fr_geoms = [g for g in geoms if 'fr' in g['language'].lower()]
-
-            pins_to_create = []
-
-            if en_geoms and fr_geoms:
-                en_desc = en_geoms[0].get('description', 'No description available.').strip()
-                fr_desc = fr_geoms[0].get('description', 'No description available.').strip()
-
-                if en_desc != fr_desc:
-                    # True multilingual translation variations detected: spit out adjacent tracking pins
-                    pins_to_create.append({
-                        "title": f"{event_title} (EN)",
-                        "body": f"<h4>{event_title}</h4><p>{en_desc}</p>",
-                        "geoms": en_geoms
-                    })
-                    pins_to_create.append({
-                        "title": f"{event_title} (FR)",
-                        "body": f"<h4>{fr_geoms[0]['event_title'].title()}</h4><p>{fr_desc}</p>",
-                        "geoms": fr_geoms
-                    })
-                else:
-                    # Content copies match precisely: generate one localized map pin container
-                    pins_to_create.append({
-                        "title": event_title,
-                        "body": f"<p>{en_desc}</p>",
-                        "geoms": geoms
-                    })
+        # --- RENDER SMART OPTIMIZED PINS ---
+        for (lon, lat), geoms in pin_aggregation.items():
+            # If multiple nodes match coordinates exactly, compile a bilingual view block
+            if len(geoms) > 1:
+                # Deduplicate matching titles or arrange alternating language texts
+                titles = list(dict.fromkeys([g['event_title'].title() for g in geoms]))
+                pin_display_name = " / ".join(titles)
+                
+                popup_sections = []
+                for g in geoms:
+                    lang_label = "English" if "en" in g['language'].lower() else "Français"
+                    popup_sections.append(f"""
+                        <h4>[{lang_label}] {g['event_title'].title()} - {g['location_name']}</h4>
+                        <p>{g['description']}</p>
+                    """)
+                
+                body_content = "<hr/>".join(popup_sections)
             else:
-                # Monolingual alert profile logic processing
-                active_geoms = en_geoms if en_geoms else fr_geoms
-                if active_geoms:
-                    fallback_desc = active_geoms[0].get('description', 'No description available.')
-                    pins_to_create.append({
-                        "title": event_title,
-                        "body": f"<p>{fallback_desc}</p>",
-                        "geoms": active_geoms
-                    })
-
-            # KML node building loop drawing our optimized point markers
-            for pin_data in pins_to_create:
-                popup_content = f"""
-                <h3>{pin_data['title']}</h3>
-                <p><b>Region:</b> {loc_name}</p>
-                <p><b>Severity:</b> {str(item.get("severity", "Unknown")).upper()}</p>
-                <hr/>
-                {pin_data['body']}
-                <hr/>
-                <p style="font-size: 11px; color: #555555;">
-                    <b>Sources:</b><br/>
-                    <a href="{cap_data_url}">View CAP JSON Data</a>
-                </p>
+                # Fallback directly to simple layout for solitary pins
+                g = geoms[0]
+                pin_display_name = g['event_title'].title()
+                body_content = f"""
+                    <h4>{g['event_title'].title()} - {g['location_name']}</h4>
+                    <p>{g['description']}</p>
                 """
 
-                # Calculates the exact centroid anchor unique to this specific sub-location cluster
-                center_lon, center_lat = calculate_centroid_from_geometries(pin_data["geoms"])
+            # Build the finalized balloon popup payload
+            popup_content = f"""
+            <h3>{pin_display_name}</h3>
+            <p><b>Severity:</b> {str(item.get("severity", "Unknown")).upper()}</p>
+            <hr/>
+            {body_content}
+            <hr/>
+            <p style="font-size: 11px; color: #555555;">
+                <b>Sources:</b><br/>
+                <a href="{cap_data_url}">View CAP JSON Data</a>
+            </p>
+            """
 
-                reg = simplekml.Region()
-                reg.latlonaltbox.north = center_lat + 0.01
-                reg.latlonaltbox.south = center_lat - 0.01
-                reg.latlonaltbox.east = center_lon + 0.01
-                reg.latlonaltbox.west = center_lon - 0.01
-                reg.lod.minlod = 24  
-                reg.lod.maxlod = -1
+            reg = simplekml.Region()
+            reg.latlonaltbox.north = lat + 0.01
+            reg.latlonaltbox.south = lat - 0.01
+            reg.latlonaltbox.east = lon + 0.01
+            reg.latlonaltbox.west = lon - 0.01
+            reg.lod.minlod = 24  
+            reg.lod.maxlod = -1
 
-                pin = target_folder.newpoint(name=pin_data['title'], coords=[(center_lon, center_lat)])
-                pin.description = popup_content
-                pin.region = reg
-                
-                style_map = simplekml.StyleMap()
-                style_map.normalstyle.iconstyle.color = kml_color
-                style_map.normalstyle.iconstyle.scale = 0.9
-                style_map.normalstyle.labelstyle.scale = 0.8  
-                
-                style_map.highlightstyle.iconstyle.color = kml_color
-                style_map.highlightstyle.iconstyle.scale = 1.1
-                style_map.highlightstyle.labelstyle.scale = 1.0 
-                
-                pin.stylemap = style_map
-                pin.style.balloonstyle.text = "$[description]"
-                pin.style.balloonstyle.bgcolor = "ffffffff"
+            pin = target_folder.newpoint(name=pin_display_name, coords=[(lon, lat)])
+            pin.description = popup_content
+            pin.region = reg
+            
+            style_map = simplekml.StyleMap()
+            style_map.normalstyle.iconstyle.color = kml_color
+            style_map.normalstyle.iconstyle.scale = 0.9
+            style_map.normalstyle.labelstyle.scale = 0.8  
+            
+            style_map.highlightstyle.iconstyle.color = kml_color
+            style_map.highlightstyle.iconstyle.scale = 1.1
+            style_map.highlightstyle.labelstyle.scale = 1.0 
+            
+            pin.stylemap = style_map
+            pin.style.balloonstyle.text = "$[description]"
+            pin.style.balloonstyle.bgcolor = "ffffffff"
         
     return Response(kml.kml(), mimetype='application/vnd.google-earth.kml+xml')
 
