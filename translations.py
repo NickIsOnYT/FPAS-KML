@@ -239,6 +239,22 @@ CATEGORY_MAPPING = {
     "böen": "Storms, Tornados, Floods & Winds",
     "groene waarschuwing voor onweer": "Storms, Tornados, Floods & Winds",
     "special weather statement": "Storms, Tornados, Floods & Winds",
+    "żółty alert na burze": "Storms, Tornados, Floods & Winds",
+    "violent thunderstorm": "Storms, Tornados, Floods & Winds",
+    "silné bouřky": "Storms, Tornados, Floods & Winds",
+    "pomarańczowy alert na burze": "Storms, Tornados, Floods & Winds",
+    "freeze rain": "Storms, Tornados, Floods & Winds",
+    "strongwind advisory": "Storms, Tornados, Floods & Winds",
+    "damaging winds": "Storms, Tornados, Floods & Winds",
+    "waakzaamheid": "Storms, Tornados, Floods & Winds",
+    "aviso de tormentas de nivel naranja": "Storms, Tornados, Floods & Winds",
+    "oranje waarschuwing voor onweer": "Storms, Tornados, Floods & Winds",
+    "vigilance orange orages": "Storms, Tornados, Floods & Winds",
+    "rainfall": "Storms, Tornados, Floods & Winds",
+    "schweres gewitter mit heftigem starkregen und hagel": "Storms, Tornados, Floods & Winds",
+    "heavyrain warning change": "Storms, Tornados, Floods & Winds",
+    "heavyrain warning": "Storms, Tornados, Floods & Winds",
+    "heavyrain advisory": "Storms, Tornados, Floods & Winds",
 
     # === TEMPERATURE EXTREMES & WINTER ===
     "aviso de temperaturas máximas de nivel amarillo": "Temperature Extremes & Winter",
@@ -349,6 +365,9 @@ CATEGORY_MAPPING = {
     "altas temperaturas": "Temperature Extremes & Winter",
     "aviso amarelo calor": "Temperature Extremes & Winter",
     "žuto upozorenje za vrućinu": "Temperature Extremes & Winter",
+    "ground frost": "Temperature Extremes & Winter",
+    "orange high-temperature warning": "Temperature Extremes & Winter",
+    "aviso de temperaturas máximas de nivel rojo": "Temperature Extremes & Winter",
 
     # === FIRE & SMOKE ===
     "awareness_type=9, awareness_level=1": "Fire & Smoke",
@@ -445,6 +464,8 @@ CATEGORY_MAPPING = {
     "海洋污染": "Marine & Coastal",
     "風暴潮警告": "Marine & Coastal",
     "low water advisory": "Marine & Coastal",
+    "wind wave advisory": "Marine & Coastal",
+    "aviso de costeros de nivel amarillo": "Marine & Coastal",
 
     # === AGRICULTURAL & ENVIRONMENTAL ===
     "air quality": "Agricultural & Environmental",
@@ -495,6 +516,8 @@ CATEGORY_MAPPING = {
     "drinking water contamination": "Emergency & Civil Defense",
     "急門診通報": "Emergency & Civil Defense",
     "emergency action notification": "Emergency & Civil Defense",
+    "icy road": "Emergency & Civil Defense",
+    "civil emergency message": "Emergency & Civil Defense",
 
     # === TEST & EXERCISE ===
     "drill": "Test & Exercise",

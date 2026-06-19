@@ -58,24 +58,7 @@ def fetch_single_alert(alert_id):
         for info_block in root.findall('.//{*}info'):
             lang = info_block.findtext('{*}language', 'en-CA')
             local_event = info_block.findtext('{*}event', event)
-            
-            # Extract basic description and instruction details
-            base_description = info_block.findtext('{*}description', 'No description.').strip()
-            local_instruction = info_block.findtext('{*}instruction', '').strip()
-            
-            # Smart Extraction: Look for richer text parameters often used by IPAWS (CMAMlongtext or CMAMtext)
-            cmam_long = None
-            cmam_short = None
-            for param in info_block.findall('{*}parameter'):
-                v_name = param.findtext('{*}valueName', '').strip()
-                v_val = param.findtext('{*}value', '').strip()
-                if v_name == 'CMAMlongtext':
-                    cmam_long = v_val
-                elif v_name == 'CMAMtext':
-                    cmam_short = v_val
-            
-            # Prioritize CMAM long text -> CMAM short text -> fallback to base description
-            local_description = cmam_long or cmam_short or base_description
+            local_description = info_block.findtext('{*}description', 'No description.')
             
             for area in info_block.findall('{*}area'):
                 area_desc = area.findtext('{*}areaDesc', 'Unknown Location')
@@ -94,7 +77,6 @@ def fetch_single_alert(alert_id):
                                 "event_title": local_event,
                                 "location_name": area_desc,
                                 "description": local_description,
-                                "instruction": local_instruction,
                                 "coords": current_poly_coords
                             })
                 
@@ -109,7 +91,6 @@ def fetch_single_alert(alert_id):
                                 "event_title": local_event,
                                 "location_name": area_desc,
                                 "description": local_description,
-                                "instruction": local_instruction,
                                 "coords": [(float(lon), float(lat))]
                             })
         
@@ -208,30 +189,27 @@ def serve_kml():
         cap_data_url = f"{API_BASE_URL}/alert/{item['id']}"
 
         rendered_polygon_fingerprints = set()
+        
+        # Cluster group tracking map using location_name alongside content fields
+        # Key: (event_title, location_name) -> Value: List of geometry matching loops
         data_groups = {}
 
         for geom in item.get("geometries", []):
             event_title = geom.get("event_title", specific_alert_name).title()
             desc_text = geom.get("description", "No description available.").strip()
-            inst_text = geom.get("instruction", "").strip()
             loc_name = geom.get("location_name", "Unknown Location")
             
-            # --- DUP-CHECKING PHYSICAL SHAPES ---
+            # --- DUP-CHECKING PHYSICAL SHAPES (Renders boundaries exactly once) ---
             if geom["type"] == "polygon" and len(geom["coords"]) > 1:
                 geo_fingerprint = f"{geom['coords'][0][0]},{geom['coords'][0][1]}_{geom['coords'][-1][0]},{geom['coords'][-1][1]}_{len(geom['coords'])}"
                 
                 if geo_fingerprint not in rendered_polygon_fingerprints:
                     popup_header = f"{event_title} - {loc_name}"
-                    
-                    shape_body = f"<p>{desc_text}</p>"
-                    if inst_text:
-                        shape_body += f"<h4>Instructions:</h4><p>{inst_text}</p>"
-
                     shape_popup = f"""
                     <h3>{popup_header}</h3>
                     <p><b>Severity:</b> {str(item.get("severity", "Unknown")).upper()}</p>
                     <hr/>
-                    {shape_body}
+                    <p>{desc_text}</p>
                     <hr/>
                     <p style="font-size: 11px; color: #555555;">
                         <b>Sources:</b><br/>
@@ -247,6 +225,7 @@ def serve_kml():
                     
                     rendered_polygon_fingerprints.add(geo_fingerprint)
 
+            # Cluster based on Content AND Location Name to isolate geographical zones cleanly
             group_key = (event_title, loc_name)
             if group_key not in data_groups:
                 data_groups[group_key] = []
@@ -261,55 +240,39 @@ def serve_kml():
 
             if en_geoms and fr_geoms:
                 en_desc = en_geoms[0].get('description', 'No description available.').strip()
-                en_inst = en_geoms[0].get('instruction', '').strip()
                 fr_desc = fr_geoms[0].get('description', 'No description available.').strip()
-                fr_inst = fr_geoms[0].get('instruction', '').strip()
 
-                if en_desc != fr_desc or en_inst != fr_inst:
-                    en_body = f"<h4>{event_title}</h4><p>{en_desc}</p>"
-                    if en_inst:
-                        en_body += f"<h5>Instructions:</h5><p>{en_inst}</p>"
-                        
-                    fr_body = f"<h4>{fr_geoms[0]['event_title'].title()}</h4><p>{fr_desc}</p>"
-                    if fr_inst:
-                        fr_body += f"<h5>Instructions:</h5><p>{fr_inst}</p>"
-
+                if en_desc != fr_desc:
+                    # True multilingual translation variations detected: spit out adjacent tracking pins
                     pins_to_create.append({
                         "title": f"{event_title} (EN)",
-                        "body": en_body,
+                        "body": f"<h4>{event_title}</h4><p>{en_desc}</p>",
                         "geoms": en_geoms
                     })
                     pins_to_create.append({
                         "title": f"{event_title} (FR)",
-                        "body": fr_body,
+                        "body": f"<h4>{fr_geoms[0]['event_title'].title()}</h4><p>{fr_desc}</p>",
                         "geoms": fr_geoms
                     })
                 else:
-                    combined_body = f"<p>{en_desc}</p>"
-                    if en_inst:
-                        combined_body += f"<h4>Instructions:</h4><p>{en_inst}</p>"
-                        
+                    # Content copies match precisely: generate one localized map pin container
                     pins_to_create.append({
                         "title": event_title,
-                        "body": combined_body,
+                        "body": f"<p>{en_desc}</p>",
                         "geoms": geoms
                     })
             else:
+                # Monolingual alert profile logic processing
                 active_geoms = en_geoms if en_geoms else fr_geoms
                 if active_geoms:
-                    fallback_desc = active_geoms[0].get('description', 'No description available Hint.').strip()
-                    fallback_inst = active_geoms[0].get('instruction', '').strip()
-                    
-                    fallback_body = f"<p>{fallback_desc}</p>"
-                    if fallback_inst:
-                        fallback_body += f"<h4>Instructions:</h4><p>{fallback_inst}</p>"
-                        
+                    fallback_desc = active_geoms[0].get('description', 'No description available.')
                     pins_to_create.append({
                         "title": event_title,
-                        "body": fallback_body,
+                        "body": f"<p>{fallback_desc}</p>",
                         "geoms": active_geoms
                     })
 
+            # KML node building loop drawing our optimized point markers
             for pin_data in pins_to_create:
                 popup_content = f"""
                 <h3>{pin_data['title']}</h3>
@@ -324,6 +287,7 @@ def serve_kml():
                 </p>
                 """
 
+                # Calculates the exact centroid anchor unique to this specific sub-location cluster
                 center_lon, center_lat = calculate_centroid_from_geometries(pin_data["geoms"])
 
                 reg = simplekml.Region()
