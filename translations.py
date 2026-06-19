@@ -225,6 +225,20 @@ CATEGORY_MAPPING = {
     "orange thunderstorm warning": "Storms, Tornados, Floods & Winds",
     "rainstorm warning signal": "Storms, Tornados, Floods & Winds",
     "severe weather warning": "Storms, Tornados, Floods & Winds",
+    "special announcement on flooding in northern new territories": "Storms, Tornados, Floods & Winds",
+    "降雨": "Storms, Tornados, Floods & Winds",
+    "雷雨": "Storms, Tornados, Floods & Winds",
+    "strong convection": "Storms, Tornados, Floods & Winds",
+    "weak convection": "Storms, Tornados, Floods & Winds",
+    "convection": "Storms, Tornados, Floods & Winds",
+    "heavy thunderstorm": "Storms, Tornados, Floods & Winds",
+    "lightning, gusty winds": "Storms, Tornados, Floods & Winds",
+    "viento zonda": "Storms, Tornados, Floods & Winds",
+    "mye lyn": "Storms, Tornados, Floods & Winds",
+    "gele waarschuwing voor onweer": "Storms, Tornados, Floods & Winds",
+    "böen": "Storms, Tornados, Floods & Winds",
+    "groene waarschuwing voor onweer": "Storms, Tornados, Floods & Winds",
+    "special weather statement": "Storms, Tornados, Floods & Winds",
 
     # === TEMPERATURE EXTREMES & WINTER ===
     "aviso de temperaturas máximas de nivel amarillo": "Temperature Extremes & Winter",
@@ -323,7 +337,18 @@ CATEGORY_MAPPING = {
     "probables nevadas": "Temperature Extremes & Winter",
     "vysoké teploty": "Temperature Extremes & Winter",
     "výstraha pred vysokými teplotami": "Temperature Extremes & Winter",
-    "visoka temperatura - zmerna ogroženost"
+    "visoka temperatura - zmerna ogroženost": "Temperature Extremes & Winter",
+    "sárga hőség figyelmeztetés": "Temperature Extremes & Winter",
+    "high temperature yellow": "Temperature Extremes & Winter",
+    "velmi vysoké teploty": "Temperature Extremes & Winter",
+    "oranje waarschuwing voor hittegolf": "Temperature Extremes & Winter",
+    "extreme hitze": "Temperature Extremes & Winter",
+    "aviso de temperaturas máximas de nivel naranja": "Temperature Extremes & Winter",
+    "żółty alert na upał": "Temperature Extremes & Winter",
+    "pomarańczowy alert na upał": "Temperature Extremes & Winter",
+    "altas temperaturas": "Temperature Extremes & Winter",
+    "aviso amarelo calor": "Temperature Extremes & Winter",
+    "žuto upozorenje za vrućinu": "Temperature Extremes & Winter",
 
     # === FIRE & SMOKE ===
     "awareness_type=9, awareness_level=1": "Fire & Smoke",
@@ -346,6 +371,10 @@ CATEGORY_MAPPING = {
     "wildfire": "Fire & Smoke",
     "пожарная опасность": "Fire & Smoke",
     "structure fire": "Fire & Smoke",
+    "bushfire": "Fire & Smoke",
+    "urban fire": "Fire & Smoke",
+    "industrial fire": "Fire & Smoke",
+    "火災": "Fire & Smoke",
 
     # === EARTHQUAKE, TSUNAMI & VOLCANO ===
     "avalanche": "Earthquake, Tsunami & Volcano",
@@ -379,6 +408,7 @@ CATEGORY_MAPPING = {
     "предупреждение о селях": "Earthquake, Tsunami & Volcano",
     "сель": "Earthquake, Tsunami & Volcano",
     "селевая опасность": "Earthquake, Tsunami & Volcano",
+    "landslip warning": "Earthquake, Tsunami & Volcano",
 
     # === MARINE & COASTAL ===
     "aallokkovaroitus": "Marine & Coastal",
@@ -432,7 +462,8 @@ CATEGORY_MAPPING = {
     "uv-tiedote": "Agricultural & Environmental",
     "water restrictions": "Agricultural & Environmental",
     "particle pollution": "Agricultural & Environmental",
-    "healt advisory": "Agricultural & Environmental",
+    "health advisory": "Agricultural & Environmental",
+    "falling object": "Agricultural & Environmental",
 
     # === EMERGENCY & CIVIL DEFENSE ===
     "chemical": "Emergency & Civil Defense",
@@ -452,6 +483,18 @@ CATEGORY_MAPPING = {
     "shelter in place": "Emergency & Civil Defense",
     "消防安全檢查重大不合格場所": "Emergency & Civil Defense",
     "鐵路事故": "Emergency & Civil Defense",
+    "safe alert activation": "Emergency & Civil Defense",
+    "civil emergency": "Emergency & Civil Defense",
+    "animal danger": "Emergency & Civil Defense",
+    "amber alert": "Emergency & Civil Defense",
+    "911 service": "Emergency & Civil Defense",
+    "terrorist threat": "Emergency & Civil Defense",
+    "explosive": "Emergency & Civil Defense",
+    "biological": "Emergency & Civil Defense",
+    "radiological": "Emergency & Civil Defense",
+    "drinking water contamination": "Emergency & Civil Defense",
+    "急門診通報": "Emergency & Civil Defense",
+    "emergency action notification": "Emergency & Civil Defense",
 
     # === TEST & EXERCISE ===
     "drill": "Test & Exercise",
@@ -466,6 +509,7 @@ CATEGORY_MAPPING = {
     "test alert": "Test & Exercise",
     "test message": "Test & Exercise",
     "tests": "Test & Exercise",
+    "required monthly test": "Test & Exercise",
 
     # === MISC ===
     "anderes ereignis": "Misc",
@@ -478,10 +522,10 @@ CATEGORY_MAPPING = {
     "other hazard": "Misc",
     "other hazards": "Misc",
     "others": "Misc",
-    "special weather statement": "Misc",
     "weather": "Misc",
     "yellow warning": "Misc",
     "прочие опасности": "Misc",
     "issue": "Misc",
     "update": "Misc",
+    "remove": "Misc",
 }
