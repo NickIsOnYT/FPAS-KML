@@ -39,5 +39,5 @@ python app.py
 
 ## Extra setup:
 
-- View [Local server setup.md](example.com)
-- View [Extra setup.md](example.com)
+- View [Local server setup.md](https://github.com/NickIsOnYT/FPAS-KML/blob/main/Extras/Local%20server%20setup.md)
+- View [Extra setup.md](https://github.com/NickIsOnYT/FPAS-KML/blob/main/Extras/Extra%20setup.md)
