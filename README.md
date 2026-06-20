@@ -9,11 +9,11 @@ A lightweight Python application that harvests global Common Alerting Protocol (
 
 - Download [Google Earth Pro](https://www.google.com/earth/about/versions/)
 - Download [Python 3.14.3](https://www.python.org/downloads/release/python-3143/)
-- Make sure to add it to your paths
+- Make sure to add it to your paths.
 
 - [Download the latest release](https://github.com/NickIsOnYT/FPAS-KML/releases)
 
-- unzip to a location, then
+- unzip to a location, then:
 
 ```bash
 cd to/the/location
