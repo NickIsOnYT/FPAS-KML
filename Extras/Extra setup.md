@@ -18,3 +18,21 @@
 2. Search for `url = f"{API_BASE_URL}/alert/area?min_lat=-90&max_lat=90&min_lon=-180&max_lon=180"`
 3. Use google earth to get the coordinates you want. (in the bottom left, "lat" and "lon" values)
 4. Change the "min_lat=#", "max_lat=#", "min_lon=#" & "max_lon=#" to the desired values.
+
+### How to update transaltions.py yourself
+
+1. Open `translations.py` in a text/code editor. (Visual Studio Code Recommended)
+
+- the side on the left is the name of the alert you want to categorize, the side on the right is the folder you want to categorize the alert to.
+
+2. Copy an alert name from the `Uncategorized Alerts` folder
+3. (optional) Translate the text to your language to know what the alert type is.
+4. De-capitalize the text. (It will not pick up the name if it contains captial letters) (i recommend [this](https://decapitalize.eu/) site to do that)
+5. Add *quotes* (`""`) then paste the de-capitalized text on the left side.
+6. Then add a *colon* *space* *quotes* then add text into the quotes.
+7. Then add a comma (`,`) at the end of 
+8. Make sure the text is at the same place as all the other text. (Aka press tab once at the start of the text if it's not equal to the other text.)
+
+- This will create a folder in Google Earth that contains any alerts that match that text exactly.
+
+- Here's a template you can work off of: `"alert name": "Alert Category",`
