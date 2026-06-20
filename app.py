@@ -7,9 +7,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 import time
 import sys
+import importlib  # Dynamic hot-reloading
 
-# Import the translation map from our new external translations module
-from translations import CATEGORY_MAPPING
+# Import the module as an object so we can pass it to importlib.reload
+import translations
 
 app = Flask(__name__)
 API_BASE_URL = "https://alerts.kde.org"
@@ -28,6 +29,13 @@ def get_kml_color(severity, alpha=150):
     else: base_color = 'ffffff'
     return alpha_hex + base_color
 
+def kml_color_to_hex(kml_color_str):
+    """Converts a KML color string (aabbggrr) to a standard CSS hex string (rrggbb)."""
+    if len(kml_color_str) == 8:
+        b, g, r = kml_color_str[2:4], kml_color_str[4:6], kml_color_str[6:8]
+        return f"{r}{g}{b}"
+    return "333333"
+
 def calculate_centroid_from_geometries(geometries):
     """Calculates a single global geographic center across a list of geometry coordinate blocks."""
     all_coords = []
@@ -39,6 +47,18 @@ def calculate_centroid_from_geometries(geometries):
     avg_lon = sum(c[0] for c in unique_coords) / len(unique_coords)
     avg_lat = sum(c[1] for c in unique_coords) / len(unique_coords)
     return (avg_lon, avg_lat)
+
+def format_cap_timestamp(ts_str):
+    """Formats standard ISO-8601 CAP timestamps into a cleaner, human-readable view."""
+    if not ts_str:
+        return "N/A"
+    try:
+        parts = ts_str.replace('T', ' ').split(':')
+        if len(parts) >= 2:
+            return f"{parts[0]}:{parts[1]}"
+    except Exception:
+        pass
+    return ts_str
 
 def fetch_single_alert(alert_id):
     try:
@@ -53,17 +73,19 @@ def fetch_single_alert(alert_id):
         event = info_main.findtext('{*}event', 'Alert')
         severity = info_main.findtext('{*}severity', 'Unknown')
         
+        raw_effective = info_main.findtext('{*}effective', '')
+        effective_time = format_cap_timestamp(raw_effective)
+        expires_time = format_cap_timestamp(info_main.findtext('{*}expires', ''))
+        
         geometries = []
         
         for info_block in root.findall('.//{*}info'):
             lang = info_block.findtext('{*}language', 'en-CA')
             local_event = info_block.findtext('{*}event', event)
             
-            # Extract basic description and instruction details
             base_description = info_block.findtext('{*}description', 'No description.').strip()
             local_instruction = info_block.findtext('{*}instruction', '').strip()
             
-            # Smart Extraction: Look for richer text parameters often used by IPAWS (CMAMlongtext or CMAMtext)
             cmam_long = None
             cmam_short = None
             for param in info_block.findall('{*}parameter'):
@@ -74,7 +96,6 @@ def fetch_single_alert(alert_id):
                 elif v_name == 'CMAMtext':
                     cmam_short = v_val
             
-            # Prioritize CMAM long text -> CMAM short text -> fallback to base description
             local_description = cmam_long or cmam_short or base_description
             
             for area in info_block.findall('{*}area'):
@@ -118,6 +139,9 @@ def fetch_single_alert(alert_id):
                 "id": alert_id,
                 "event_type": event,
                 "severity": severity,
+                "raw_effective": raw_effective or "0000-00-00",
+                "effective": effective_time,
+                "expires": expires_time,
                 "geometries": geometries
             }
     except Exception:
@@ -176,13 +200,20 @@ def background_alert_harvester():
 @app.route('/alerts.kml')
 def serve_kml():
     print(f"Request detected, Serving {len(ALERT_CACHE)} alerts from local memory.", flush=True)
+    
+    try:
+        importlib.reload(translations)
+    except Exception as reload_error:
+        print(f"Warning: Failed to hot-reload translations.py: {reload_error}", flush=True)
+        
     kml = simplekml.Kml()
     
     with cache_lock:
-        cached_alerts = list(ALERT_CACHE.values())
+        cached_alerts = sorted(list(ALERT_CACHE.values()), key=lambda x: x.get("raw_effective", ""))
         
-    category_folders = {}
-    subcategory_folders = {}
+    temp_categories = {}
+    rendered_polygon_fingerprints = set()
+    geolocated_pin_buckets = {}
 
     for item in cached_alerts:
         kml_color = get_kml_color(item["severity"])
@@ -190,24 +221,21 @@ def serve_kml():
         lookup_event = raw_event.lower()
         specific_alert_name = raw_event.title() if raw_event else "Active Alert"
         
-        if lookup_event in CATEGORY_MAPPING:
-            category_name = CATEGORY_MAPPING[lookup_event]
+        if lookup_event in translations.CATEGORY_MAPPING:
+            category_name = translations.CATEGORY_MAPPING[lookup_event]
         else:
-            category_name = specific_alert_name
+            category_name = "Uncategorized Alerts"
         
-        if category_name not in category_folders:
-            category_folders[category_name] = kml.newfolder(name=category_name)
-        
-        parent_folder = category_folders[category_name]
-        
-        sub_folder_key = (category_name, specific_alert_name)
-        if sub_folder_key not in subcategory_folders:
-            subcategory_folders[sub_folder_key] = parent_folder.newfolder(name=specific_alert_name)
+        if category_name not in temp_categories:
+            temp_categories[category_name] = {}
             
-        target_folder = subcategory_folders[sub_folder_key]
+        if specific_alert_name not in temp_categories[category_name]:
+            temp_categories[category_name][specific_alert_name] = []
+            
         cap_data_url = f"{API_BASE_URL}/alert/{item['id']}"
+        effective_str = item.get("effective", "N/A")
+        expires_str = item.get("expires", "N/A")
 
-        rendered_polygon_fingerprints = set()
         data_groups = {}
 
         for geom in item.get("geometries", []):
@@ -216,43 +244,11 @@ def serve_kml():
             inst_text = geom.get("instruction", "").strip()
             loc_name = geom.get("location_name", "Unknown Location")
             
-            # --- DUP-CHECKING PHYSICAL SHAPES ---
-            if geom["type"] == "polygon" and len(geom["coords"]) > 1:
-                geo_fingerprint = f"{geom['coords'][0][0]},{geom['coords'][0][1]}_{geom['coords'][-1][0]},{geom['coords'][-1][1]}_{len(geom['coords'])}"
-                
-                if geo_fingerprint not in rendered_polygon_fingerprints:
-                    popup_header = f"{event_title} - {loc_name}"
-                    
-                    shape_body = f"<p>{desc_text}</p>"
-                    if inst_text:
-                        shape_body += f"<h4>Instructions:</h4><p>{inst_text}</p>"
-
-                    shape_popup = f"""
-                    <h3>{popup_header}</h3>
-                    <p><b>Severity:</b> {str(item.get("severity", "Unknown")).upper()}</p>
-                    <hr/>
-                    {shape_body}
-                    <hr/>
-                    <p style="font-size: 11px; color: #555555;">
-                        <b>Sources:</b><br/>
-                        <a href="{cap_data_url}">View CAP JSON Data</a>
-                    </p>
-                    """
-                    pol = target_folder.newpolygon(name=event_title, outerboundaryis=geom["coords"])
-                    pol.description = shape_popup
-                    pol.style.polystyle.color = kml_color
-                    pol.style.linestyle.color = kml_color
-                    pol.style.balloonstyle.text = "$[description]"
-                    pol.style.balloonstyle.bgcolor = "ffffffff"
-                    
-                    rendered_polygon_fingerprints.add(geo_fingerprint)
-
             group_key = (event_title, loc_name)
             if group_key not in data_groups:
                 data_groups[group_key] = []
             data_groups[group_key].append(geom)
 
-        # --- SMART DEDUPLICATED MULTI-LINGUAL PIN GENERATION ---
         for (event_title, loc_name), geoms in data_groups.items():
             en_geoms = [g for g in geoms if 'en' in g['language'].lower()]
             fr_geoms = [g for g in geoms if 'fr' in g['language'].lower()]
@@ -267,89 +263,172 @@ def serve_kml():
 
                 if en_desc != fr_desc or en_inst != fr_inst:
                     en_body = f"<h4>{event_title}</h4><p>{en_desc}</p>"
-                    if en_inst:
-                        en_body += f"<h5>Instructions:</h5><p>{en_inst}</p>"
-                        
+                    if en_inst: en_body += f"<h5>Instructions:</h5><p>{en_inst}</p>"
                     fr_body = f"<h4>{fr_geoms[0]['event_title'].title()}</h4><p>{fr_desc}</p>"
-                    if fr_inst:
-                        fr_body += f"<h5>Instructions:</h5><p>{fr_inst}</p>"
+                    if fr_inst: fr_body += f"<h5>Instructions:</h5><p>{fr_inst}</p>"
 
-                    pins_to_create.append({
-                        "title": f"{event_title} (EN)",
-                        "body": en_body,
-                        "geoms": en_geoms
-                    })
-                    pins_to_create.append({
-                        "title": f"{event_title} (FR)",
-                        "body": fr_body,
-                        "geoms": fr_geoms
-                    })
+                    pins_to_create.append({"title": f"{event_title} (EN)", "body": en_body, "geoms": en_geoms})
+                    pins_to_create.append({"title": f"{event_title} (FR)", "body": fr_body, "geoms": fr_geoms})
                 else:
                     combined_body = f"<p>{en_desc}</p>"
-                    if en_inst:
-                        combined_body += f"<h4>Instructions:</h4><p>{en_inst}</p>"
-                        
-                    pins_to_create.append({
-                        "title": event_title,
-                        "body": combined_body,
-                        "geoms": geoms
-                    })
+                    if en_inst: combined_body += f"<h4>Instructions:</h4><p>{en_inst}</p>"
+                    pins_to_create.append({"title": event_title, "body": combined_body, "geoms": geoms})
             else:
                 active_geoms = en_geoms if en_geoms else fr_geoms
                 if active_geoms:
-                    fallback_desc = active_geoms[0].get('description', 'No description available Hint.').strip()
+                    fallback_desc = active_geoms[0].get('description', 'No description available.').strip()
                     fallback_inst = active_geoms[0].get('instruction', '').strip()
-                    
                     fallback_body = f"<p>{fallback_desc}</p>"
-                    if fallback_inst:
-                        fallback_body += f"<h4>Instructions:</h4><p>{fallback_inst}</p>"
-                        
-                    pins_to_create.append({
-                        "title": event_title,
-                        "body": fallback_body,
-                        "geoms": active_geoms
-                    })
+                    if fallback_inst: fallback_body += f"<h4>Instructions:</h4><p>{fallback_inst}</p>"
+                    pins_to_create.append({"title": event_title, "body": fallback_body, "geoms": active_geoms})
 
             for pin_data in pins_to_create:
-                popup_content = f"""
-                <h3>{pin_data['title']}</h3>
-                <p><b>Region:</b> {loc_name}</p>
-                <p><b>Severity:</b> {str(item.get("severity", "Unknown")).upper()}</p>
-                <hr/>
-                {pin_data['body']}
-                <hr/>
-                <p style="font-size: 11px; color: #555555;">
-                    <b>Sources:</b><br/>
-                    <a href="{cap_data_url}">View CAP JSON Data</a>
-                </p>
+                raw_lon, raw_lat = calculate_centroid_from_geometries(pin_data["geoms"])
+                coord_bucket = (round(raw_lon, 5), round(raw_lat, 5))
+                
+                if coord_bucket not in geolocated_pin_buckets:
+                    geolocated_pin_buckets[coord_bucket] = []
+                    
+                geolocated_pin_buckets[coord_bucket].append({
+                    "category": category_name,
+                    "subcategory": specific_alert_name,
+                    "title": pin_data['title'],
+                    "loc_name": loc_name,
+                    "severity": str(item.get("severity", "Unknown")).upper(),
+                    "effective": effective_str,
+                    "expires": expires_str,
+                    "body": pin_data['body'],
+                    "url": cap_data_url,
+                    "color": kml_color,
+                    "raw_lon": raw_lon,
+                    "raw_lat": raw_lat,
+                    "geoms": pin_data["geoms"]
+                })
+
+    sorted_category_names = sorted(list(temp_categories.keys()))
+    category_folders = {}
+    subcategory_folders = {}
+
+    for cat_name in sorted_category_names:
+        category_folders[cat_name] = kml.newfolder(name=cat_name)
+        sorted_sub_names = sorted(list(temp_categories[cat_name].keys()))
+        
+        for sub_name in sorted_sub_names:
+            sub_folder_key = (cat_name, sub_name)
+            subcategory_folders[sub_folder_key] = category_folders[cat_name].newfolder(name=sub_name)
+
+    for coord_bucket, stacked_pins in geolocated_pin_buckets.items():
+        lead_pin = stacked_pins[0]
+        target_folder = subcategory_folders[(lead_pin["category"], lead_pin["subcategory"])]
+
+        if len(stacked_pins) > 1:
+            consolidated_title = f"{lead_pin['subcategory']} ({len(stacked_pins)})"
+            balloon_body_pieces = []
+            source_links_by_index = []
+            
+            for idx, p in enumerate(stacked_pins, 1):
+                web_hex = kml_color_to_hex(p['color'])
+                section = f"""
+                <div style="border-left: 4px solid #{web_hex}; padding-left: 8px; margin-bottom: 12px;">
+                    <strong style="font-size:14px;">#{idx}: {p['title']}</strong><br/>
+                    <small><b>Severity:</b> {p['severity']} &nbsp;|&nbsp; <b>Active:</b> {p['effective']} to {p['expires']}</small>
+                    {p['body']}
+                </div>
+                <hr style="border: 0; border-top: 1px dashed #ccc;"/>
                 """
-
-                center_lon, center_lat = calculate_centroid_from_geometries(pin_data["geoms"])
-
-                reg = simplekml.Region()
-                reg.latlonaltbox.north = center_lat + 0.01
-                reg.latlonaltbox.south = center_lat - 0.01
-                reg.latlonaltbox.east = center_lon + 0.01
-                reg.latlonaltbox.west = center_lon - 0.01
-                reg.lod.minlod = 24  
-                reg.lod.maxlod = -1
-
-                pin = target_folder.newpoint(name=pin_data['title'], coords=[(center_lon, center_lat)])
-                pin.description = popup_content
-                pin.region = reg
+                balloon_body_pieces.append(section)
                 
-                style_map = simplekml.StyleMap()
-                style_map.normalstyle.iconstyle.color = kml_color
-                style_map.normalstyle.iconstyle.scale = 0.9
-                style_map.normalstyle.labelstyle.scale = 0.8  
-                
-                style_map.highlightstyle.iconstyle.color = kml_color
-                style_map.highlightstyle.iconstyle.scale = 1.1
-                style_map.highlightstyle.labelstyle.scale = 1.0 
-                
-                pin.stylemap = style_map
-                pin.style.balloonstyle.text = "$[description]"
-                pin.style.balloonstyle.bgcolor = "ffffffff"
+                # Pair the index with the alert details for clear numbering below
+                source_links_by_index.append(
+                    f'<li><b>#{idx} ({p["title"]}):</b> <a href="{p["url"]}">View CAP JSON</a></li>'
+                )
+            
+            sources_html = "".join(source_links_by_index)
+            
+            popup_content = f"""
+            <h3>{consolidated_title}</h3>
+            <p><b>Region:</b> {lead_pin['loc_name']}</p>
+            <hr/>
+            {"".join(balloon_body_pieces)}
+            <h4 style="margin-top:10px; margin-bottom:5px;">Sources:</h4>
+            <ul style="margin-top:0px; padding-left:20px; font-size:11px; color:#555555;">
+                {sources_html}
+            </ul>
+            """
+        else:
+            consolidated_title = lead_pin['title']
+            popup_content = f"""
+            <h3>{lead_pin['title']}</h3>
+            <p><b>Region:</b> {lead_pin['loc_name']}</p>
+            <p>
+                <b>Severity:</b> {lead_pin['severity']} &nbsp;|&nbsp; 
+                <b>Active:</b> {lead_pin['effective']} to {lead_pin['expires']}
+            </p>
+            <hr/>
+            {lead_pin['body']}
+            <hr/>
+            <h4 style="margin-bottom:5px;">Sources:</h4>
+            <p style="font-size: 11px; margin-top:0px; color: #555555;">
+                <b>{lead_pin['title']}:</b> <a href="{lead_pin['url']}">View CAP JSON Data</a>
+            </p>
+            """
+
+        reg = simplekml.Region()
+        reg.latlonaltbox.north = lead_pin['raw_lat'] + 0.01
+        reg.latlonaltbox.south = lead_pin['raw_lat'] - 0.01
+        reg.latlonaltbox.east = lead_pin['raw_lon'] + 0.01
+        reg.latlonaltbox.west = lead_pin['raw_lon'] - 0.01
+        reg.lod.minlod = 24  
+        reg.lod.maxlod = -1
+
+        pin = target_folder.newpoint(name=consolidated_title, coords=[(lead_pin['raw_lon'], lead_pin['raw_lat'])])
+        pin.description = popup_content
+        pin.region = reg
+        
+        style_map = simplekml.StyleMap()
+        style_map.normalstyle.iconstyle.color = lead_pin['color']
+        style_map.normalstyle.iconstyle.scale = 0.9
+        style_map.normalstyle.labelstyle.scale = 0.8  
+        
+        style_map.highlightstyle.iconstyle.color = lead_pin['color']
+        style_map.highlightstyle.iconstyle.scale = 1.1
+        style_map.highlightstyle.labelstyle.scale = 1.0 
+        
+        pin.stylemap = style_map
+        pin.style.balloonstyle.text = "$[description]"
+        pin.style.balloonstyle.bgcolor = "ffffffff"
+
+        for p in stacked_pins:
+            for geom in p["geoms"]:
+                if geom["type"] == "polygon" and len(geom["coords"]) > 1:
+                    geo_fingerprint = f"{geom['coords'][0][0]},{geom['coords'][0][1]}_{geom['coords'][-1][0]}_{geom['coords'][-1][1]}_{len(geom['coords'])}"
+                    
+                    if geo_fingerprint not in rendered_polygon_fingerprints:
+                        shape_popup = f"""
+                        <h3>{geom['event_title'].title()} - {geom['location_name']}</h3>
+                        <p><b>Severity:</b> {p['severity']} &nbsp;|&nbsp; <b>Active:</b> {p['effective']} to {p['expires']}</p>
+                        <hr/>
+                        <p>{geom['description']}</p>
+                        """
+                        if geom['instruction']:
+                            shape_popup += f"<h4>Instructions:</h4><p>{geom['instruction']}</p>"
+                        
+                        shape_popup += f"""
+                        <hr/>
+                        <h4 style="margin-bottom:5px;">Sources:</h4>
+                        <p style="font-size: 11px; margin-top:0px; color: #555555;">
+                            <b>{geom['event_title'].title()}:</b> <a href="{p['url']}">View CAP JSON Data</a>
+                        </p>
+                        """
+                        
+                        pol = target_folder.newpolygon(name=geom['event_title'].title(), outerboundaryis=geom["coords"])
+                        pol.description = shape_popup
+                        pol.style.polystyle.color = p['color']
+                        pol.style.linestyle.color = p['color']
+                        pol.style.balloonstyle.text = "$[description]"
+                        pol.style.balloonstyle.bgcolor = "ffffffff"
+                        
+                        rendered_polygon_fingerprints.add(geo_fingerprint)
         
     return Response(kml.kml(), mimetype='application/vnd.google-earth.kml+xml')
 

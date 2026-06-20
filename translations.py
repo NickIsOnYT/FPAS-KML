@@ -255,6 +255,31 @@ CATEGORY_MAPPING = {
     "heavyrain warning change": "Storms, Tornados, Floods & Winds",
     "heavyrain warning": "Storms, Tornados, Floods & Winds",
     "heavyrain advisory": "Storms, Tornados, Floods & Winds",
+    "výstraha pred búrku s krúpami": "Storms, Tornados, Floods & Winds",
+    "zmerna hudourniška poplava": "Storms, Tornados, Floods & Winds",
+    "sárga eső figyelmeztetés": "Storms, Tornados, Floods & Winds",
+    "perkūnija": "Storms, Tornados, Floods & Winds",
+    "velmi silné bouřky": "Storms, Tornados, Floods & Winds",
+    "general flood advisory (moderate)": "Storms, Tornados, Floods & Winds",
+    "heavy rainfall": "Storms, Tornados, Floods & Winds",
+    "rain yellow": "Storms, Tornados, Floods & Winds",
+    "nevihte - velika ogroženost": "Storms, Tornados, Floods & Winds",
+    "thunderstorm orange": "Storms, Tornados, Floods & Winds",
+    "thunderstorms level 1": "Storms, Tornados, Floods & Winds",
+    "thunderstorms/squall lines": "Storms, Tornados, Floods & Winds",
+    "heavyrain advisory change": "Storms, Tornados, Floods & Winds",
+    "strongwind warning change": "Storms, Tornados, Floods & Winds",
+    "strongwind advisory": "Storms, Tornados, Floods & Winds",
+    "strongwind advisory change": "Storms, Tornados, Floods & Winds",
+    "strongwind warning": "Storms, Tornados, Floods & Winds",
+    "smarkus lietus": "Storms, Tornados, Floods & Winds",
+    "kruša": "Storms, Tornados, Floods & Winds",
+    "dense fog": "Storms, Tornados, Floods & Winds",
+    "dense fog advisory": "Storms, Tornados, Floods & Winds",
+    "dense fog warning": "Storms, Tornados, Floods & Winds",
+    "czerwony alert na burze": "Storms, Tornados, Floods & Winds",
+    "żółty alert na burze w strefie brzegowej": "Storms, Tornados, Floods & Winds",
+    "tropical cyclone alert": "Storms, Tornados, Floods & Winds",
 
     # === TEMPERATURE EXTREMES & WINTER ===
     "aviso de temperaturas máximas de nivel amarillo": "Temperature Extremes & Winter",
@@ -368,6 +393,13 @@ CATEGORY_MAPPING = {
     "ground frost": "Temperature Extremes & Winter",
     "orange high-temperature warning": "Temperature Extremes & Winter",
     "aviso de temperaturas máximas de nivel rojo": "Temperature Extremes & Winter",
+    "moderate temperatures altes": "Temperature Extremes & Winter",
+    "aviso laranja calor": "Temperature Extremes & Winter",
+    "high temperature orange": "Temperature Extremes & Winter",
+    "visoka temperatura - velika ogroženost": "Temperature Extremes & Winter",
+    "severe temperatures altes": "Temperature Extremes & Winter",
+    "vigilance rouge canicule": "Temperature Extremes & Winter",
+    "heladas moderadas": "Temperature Extremes & Winter",
 
     # === FIRE & SMOKE ===
     "awareness_type=9, awareness_level=1": "Fire & Smoke",
@@ -394,6 +426,7 @@ CATEGORY_MAPPING = {
     "urban fire": "Fire & Smoke",
     "industrial fire": "Fire & Smoke",
     "火災": "Fire & Smoke",
+    "maastopalovaroitus": "Fire & Smoke",
 
     # === EARTHQUAKE, TSUNAMI & VOLCANO ===
     "avalanche": "Earthquake, Tsunami & Volcano",
@@ -466,6 +499,12 @@ CATEGORY_MAPPING = {
     "low water advisory": "Marine & Coastal",
     "wind wave advisory": "Marine & Coastal",
     "aviso de costeros de nivel amarillo": "Marine & Coastal",
+    "wind wave warning": "Marine & Coastal",
+    "wind wave warning change": "Marine & Coastal",
+    "coastal event": "Marine & Coastal",
+    "high water level": "Marine & Coastal",
+    "high seas": "Marine & Coastal",
+    "wind wave advisory clear": "Marine & Coastal",
 
     # === AGRICULTURAL & ENVIRONMENTAL ===
     "air quality": "Agricultural & Environmental",
@@ -533,6 +572,7 @@ CATEGORY_MAPPING = {
     "test message": "Test & Exercise",
     "tests": "Test & Exercise",
     "required monthly test": "Test & Exercise",
+    "demo warning": "Test & Exercise",
 
     # === MISC ===
     "anderes ereignis": "Misc",
