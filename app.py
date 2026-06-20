@@ -209,7 +209,8 @@ def serve_kml():
     kml = simplekml.Kml()
     
     with cache_lock:
-        cached_alerts = sorted(list(ALERT_CACHE.values()), key=lambda x: x.get("raw_effective", ""))
+        # FIXED: Sort cache descending (reverse=True) so the most recent effective alerts are grouped first
+        cached_alerts = sorted(list(ALERT_CACHE.values()), key=lambda x: x.get("raw_effective", ""), reverse=True)
         
     temp_categories = {}
     rendered_polygon_fingerprints = set()
@@ -318,6 +319,7 @@ def serve_kml():
             subcategory_folders[sub_folder_key] = category_folders[cat_name].newfolder(name=sub_name)
 
     for coord_bucket, stacked_pins in geolocated_pin_buckets.items():
+        # Note: geolocated_pin_buckets layout preserves order inherited from the descending cached_alerts sort
         lead_pin = stacked_pins[0]
         target_folder = subcategory_folders[(lead_pin["category"], lead_pin["subcategory"])]
 
@@ -338,7 +340,6 @@ def serve_kml():
                 """
                 balloon_body_pieces.append(section)
                 
-                # Pair the index with the alert details for clear numbering below
                 source_links_by_index.append(
                     f'<li><b>#{idx} ({p["title"]}):</b> <a href="{p["url"]}">View CAP JSON</a></li>'
                 )

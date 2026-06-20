@@ -280,6 +280,11 @@ CATEGORY_MAPPING = {
     "czerwony alert na burze": "Storms, Tornados, Floods & Winds",
     "żółty alert na burze w strefie brzegowej": "Storms, Tornados, Floods & Winds",
     "tropical cyclone alert": "Storms, Tornados, Floods & Winds",
+    "thunderstorm yellow warning": "Storms, Tornados, Floods & Winds",
+    "rain orange": "Storms, Tornados, Floods & Winds",
+    "general flood advisory (severe)": "Storms, Tornados, Floods & Winds",
+    "blowing dust warning": "Storms, Tornados, Floods & Winds",
+    "lluvia y tormenta": "Storms, Tornados, Floods & Winds",
 
     # === TEMPERATURE EXTREMES & WINTER ===
     "aviso de temperaturas máximas de nivel amarillo": "Temperature Extremes & Winter",
@@ -400,6 +405,8 @@ CATEGORY_MAPPING = {
     "severe temperatures altes": "Temperature Extremes & Winter",
     "vigilance rouge canicule": "Temperature Extremes & Winter",
     "heladas moderadas": "Temperature Extremes & Winter",
+    "amber extreme_heat warning": "Temperature Extremes & Winter",
+    "narančasto upozorenje za vrućinu": "Temperature Extremes & Winter",
 
     # === FIRE & SMOKE ===
     "awareness_type=9, awareness_level=1": "Fire & Smoke",
@@ -427,6 +434,7 @@ CATEGORY_MAPPING = {
     "industrial fire": "Fire & Smoke",
     "火災": "Fire & Smoke",
     "maastopalovaroitus": "Fire & Smoke",
+    "fire evacuations - deer canyon": "Fire & Smoke",
 
     # === EARTHQUAKE, TSUNAMI & VOLCANO ===
     "avalanche": "Earthquake, Tsunami & Volcano",
