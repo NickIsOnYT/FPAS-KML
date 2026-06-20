@@ -407,6 +407,7 @@ CATEGORY_MAPPING = {
     "heladas moderadas": "Temperature Extremes & Winter",
     "amber extreme_heat warning": "Temperature Extremes & Winter",
     "narančasto upozorenje za vrućinu": "Temperature Extremes & Winter",
+    "very hot weather warning": "Temperature Extremes & Winter",
 
     # === FIRE & SMOKE ===
     "awareness_type=9, awareness_level=1": "Fire & Smoke",
