@@ -61,3 +61,7 @@ python app.py
 - Keep all three profile checkboxes ticked (Domain, Private, Public) and click Next.
 
 - Give it a name like Python KML Server and click Finish.
+
+### Extra setup
+
+- todo
