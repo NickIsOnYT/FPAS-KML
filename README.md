@@ -1,4 +1,4 @@
-# Global CAP Weather & Hazard Alert KML Server
+# Google Earth FossWarn alert displayer.
 
 A lightweight Python application that harvests global Common Alerting Protocol (CAP) data from `alerts.kde.org`, processes it into a localized memory cache via background threads, and streams custom-styled KML files instantly to Google Earth Pro.
 
