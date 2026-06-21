@@ -1,19 +1,22 @@
-# Global CAP Weather & Hazard Alert KML Server
+# Google Earth FossWarn alert displayer.
 
-A lightweight Python application that harvests global Common Alerting Protocol (CAP) data from `alerts.kde.org`, processes it into a localized memory cache via background threads, and streams custom-styled KML files instantly to Google Earth Pro.
+A Python application that harvests Common Alerting Protocol (CAP) data from `alerts.kde.org`, processes it into a localized memory cache, and streams custom KML files to Google Earth Pro.
 
 (Script made with Google Gemini)
 
+### Requirements
+
+- The script uses 1.3~ish GB of RAM for me.
 
 ## Setup and Installation
 
 - Download [Google Earth Pro](https://www.google.com/earth/about/versions/)
 - Download [Python 3.14.3](https://www.python.org/downloads/release/python-3143/)
-- Make sure to add it to your paths
+- Make sure to add it to your paths.
 
 - [Download the latest release](https://github.com/NickIsOnYT/FPAS-KML/releases)
 
-- unzip to a location, then
+- unzip to a location, then:
 
 ```bash
 cd to/the/location
