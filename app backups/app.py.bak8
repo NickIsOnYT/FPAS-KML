@@ -7,8 +7,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 import time
 import sys
-import importlib
-import math
+import importlib  # Dynamic hot-reloading
 
 # Import the module as an object so we can pass it to importlib.reload
 import translations
@@ -210,11 +209,10 @@ def serve_kml():
     kml = simplekml.Kml()
     
     with cache_lock:
-        # Sort cache descending (reverse=True) so the most recent effective alerts appear first
+        # FIXED: Sort cache descending (reverse=True) so the most recent effective alerts are grouped first
         cached_alerts = sorted(list(ALERT_CACHE.values()), key=lambda x: x.get("raw_effective", ""), reverse=True)
         
-    # We will track active items here to build folders dynamically later
-    active_categories_and_subs = {} 
+    temp_categories = {}
     rendered_polygon_fingerprints = set()
     geolocated_pin_buckets = {}
 
@@ -228,6 +226,12 @@ def serve_kml():
             category_name = translations.CATEGORY_MAPPING[lookup_event]
         else:
             category_name = "Uncategorized Alerts"
+        
+        if category_name not in temp_categories:
+            temp_categories[category_name] = {}
+            
+        if specific_alert_name not in temp_categories[category_name]:
+            temp_categories[category_name][specific_alert_name] = []
             
         cap_data_url = f"{API_BASE_URL}/alert/{item['id']}"
         effective_str = item.get("effective", "N/A")
@@ -301,27 +305,21 @@ def serve_kml():
                     "raw_lat": raw_lat,
                     "geoms": pin_data["geoms"]
                 })
-                
-                # Track exactly which categories and subcategories have actual data entries
-                if category_name not in active_categories_and_subs:
-                    active_categories_and_subs[category_name] = set()
-                active_categories_and_subs[category_name].add(specific_alert_name)
 
-    # FIXED: Generate folders dynamically ONLY for categories that actually have active alerts
+    sorted_category_names = sorted(list(temp_categories.keys()))
     category_folders = {}
     subcategory_folders = {}
-    
-    sorted_active_categories = sorted(list(active_categories_and_subs.keys()))
-    for cat_name in sorted_active_categories:
+
+    for cat_name in sorted_category_names:
         category_folders[cat_name] = kml.newfolder(name=cat_name)
+        sorted_sub_names = sorted(list(temp_categories[cat_name].keys()))
         
-        sorted_active_subs = sorted(list(active_categories_and_subs[cat_name]))
-        for sub_name in sorted_active_subs:
+        for sub_name in sorted_sub_names:
             sub_folder_key = (cat_name, sub_name)
             subcategory_folders[sub_folder_key] = category_folders[cat_name].newfolder(name=sub_name)
 
-    # Render points and shapes to their target folders
     for coord_bucket, stacked_pins in geolocated_pin_buckets.items():
+        # Note: geolocated_pin_buckets layout preserves order inherited from the descending cached_alerts sort
         lead_pin = stacked_pins[0]
         target_folder = subcategory_folders[(lead_pin["category"], lead_pin["subcategory"])]
 
@@ -432,44 +430,6 @@ def serve_kml():
                         pol.style.balloonstyle.bgcolor = "ffffffff"
                         
                         rendered_polygon_fingerprints.add(geo_fingerprint)
-                        
-                elif geom["type"] == "circle":
-                    lon_c, lat_c = geom["coords"][0]
-                    radius = geom.get("radius_meters", 0.0)
-                    
-                    if radius > 0:
-                        deg_radius = radius / 111000.0 
-                        circle_coords = []
-                        
-                        for i in range(37): 
-                            angle = math.radians(i * 10)
-                            p_lon = lon_c + (deg_radius * math.cos(angle)) / math.cos(math.radians(lat_c))
-                            p_lat = lat_c + (deg_radius * math.sin(angle))
-                            circle_coords.append((p_lon, p_lat))
-                            
-                        shape_popup = f"""
-                        <h3>{geom['event_title'].title()} - {geom['location_name']}</h3>
-                        <p><b>Severity:</b> {p['severity']} &nbsp;|&nbsp; <b>Active:</b> {p['effective']} to {p['expires']}</p>
-                        <hr/>
-                        <p>{geom['description']}</p>
-                        """
-                        if geom['instruction']:
-                            shape_popup += f"<h4>Instructions:</h4><p>{geom['instruction']}</p>"
-                        
-                        shape_popup += f"""
-                        <hr/>
-                        <h4 style="margin-bottom:5px;">Sources:</h4>
-                        <p style="font-size: 11px; margin-top:0px; color: #555555;">
-                            <b>{geom['event_title'].title()}:</b> <a href="{p['url']}">View CAP JSON Data</a>
-                        </p>
-                        """
-                        
-                        pol = target_folder.newpolygon(name=geom['event_title'].title(), outerboundaryis=circle_coords)
-                        pol.description = shape_popup
-                        pol.style.polystyle.color = p['color']
-                        pol.style.linestyle.color = p['color']
-                        pol.style.balloonstyle.text = "$[description]"
-                        pol.style.balloonstyle.bgcolor = "ffffffff"
         
     return Response(kml.kml(), mimetype='application/vnd.google-earth.kml+xml')
 
