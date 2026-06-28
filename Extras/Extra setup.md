@@ -8,7 +8,7 @@
 1. Right-click the "FOSS Live Alerts" folder or the added network link.
 2. Click on properties, then the refresh tab in the window that opened.
 3. Change the time-based refresh to be any interval you want. (I'd recommend setting it to `1 minute` for default use.)
-4. Keep this in mind if you want to do anything below. When the list refreshes, Google Earth minimizes the folder, so I would recommend setting it to `Once` then refreshing manually for better tweaking.
+- Keep this in mind if you want to do anything below. When the list refreshes, Google Earth minimizes the folder, so I would recommend setting it to `Once` then refreshing manually for better tweaking.
 
 
 ### Adjust the alert pulling frequency
