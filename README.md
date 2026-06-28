@@ -1,12 +1,14 @@
 # Google Earth FossWarn alert displayer.
 
-A Python application that harvests Common Alerting Protocol (CAP) data from `alerts.kde.org`, processes it into a localized memory cache, and streams custom KML files to Google Earth Pro.
+A Python application that harvests Common Alerting Protocol (CAP) data from `alerts.kde.org`, processes it into a localized memory cache + disk storage, and streams custom KML files to Google Earth Pro.
 
 (Script made with Google Gemini)
 
 ### Requirements
 
-- The script uses 1.3~ish GB of RAM for me.
+- The script uses around 500~ish MB of RAM.
+- Google Earth with only the KML file open uses the cache amount of RAM set in the settings.
+- Just make sure your computer has enough RAM if you want to load all alerts into Google Earth.
 
 ## Setup and Installation
 
