@@ -285,6 +285,21 @@ CATEGORY_MAPPING = {
     "general flood advisory (severe)": "Storms, Tornados, Floods & Winds",
     "blowing dust warning": "Storms, Tornados, Floods & Winds",
     "lluvia y tormenta": "Storms, Tornados, Floods & Winds",
+    "fresh wind + dust": "Storms, Tornados, Floods & Winds",
+    "pomarańczowy alert na burze w strefie brzegowej": "Storms, Tornados, Floods & Winds",
+    "rain/wet spell": "Storms, Tornados, Floods & Winds",
+    "strong thunderstorm watch": "Storms, Tornados, Floods & Winds",
+    "vorabinformation schweres gewitter": "Storms, Tornados, Floods & Winds",
+    "výstraha pred silnou búrku s krúpami": "Storms, Tornados, Floods & Winds",
+    "thunderstorms, gust, heavy rain": "Storms, Tornados, Floods & Winds",
+    "brisk wind advisory": "Storms, Tornados, Floods & Winds",
+    "brisk wind warning": "Storms, Tornados, Floods & Winds",
+    "overland flow flood": "Storms, Tornados, Floods & Winds",
+    "yellow fog warning": "Storms, Tornados, Floods & Winds",
+    "moderate tempestes": "Storms, Tornados, Floods & Winds",
+    "narančasto upozorenje za vjetar": "Storms, Tornados, Floods & Winds",
+    "tormentas fuertes con lluvias intensas - aviso naranja": "Storms, Tornados, Floods & Winds",
+    "yellow rain warning": "Storms, Tornados, Floods & Winds",
 
     # === TEMPERATURE EXTREMES & WINTER ===
     "aviso de temperaturas máximas de nivel amarillo": "Temperature Extremes & Winter",
@@ -408,6 +423,10 @@ CATEGORY_MAPPING = {
     "amber extreme_heat warning": "Temperature Extremes & Winter",
     "narančasto upozorenje za vrućinu": "Temperature Extremes & Winter",
     "very hot weather warning": "Temperature Extremes & Winter",
+    "minor high temperature warning": "Temperature Extremes & Winter",
+    "moderate high temperature warning": "Temperature Extremes & Winter",
+    "yellow high temperature": "Temperature Extremes & Winter",
+    "yellow low-temperature warning": "Temperature Extremes & Winter",
 
     # === FIRE & SMOKE ===
     "awareness_type=9, awareness_level=1": "Fire & Smoke",
@@ -470,6 +489,7 @@ CATEGORY_MAPPING = {
     "сель": "Earthquake, Tsunami & Volcano",
     "селевая опасность": "Earthquake, Tsunami & Volcano",
     "landslip warning": "Earthquake, Tsunami & Volcano",
+    "geologic hazard": "Earthquake, Tsunami & Volcano",
 
     # === MARINE & COASTAL ===
     "aallokkovaroitus": "Marine & Coastal",
@@ -514,6 +534,10 @@ CATEGORY_MAPPING = {
     "high water level": "Marine & Coastal",
     "high seas": "Marine & Coastal",
     "wind wave advisory clear": "Marine & Coastal",
+    "wind, rough seas, gust": "Marine & Coastal",
+    "wind wave advisory change": "Marine & Coastal",
+    "wind wave advisory continue": "Marine & Coastal",
+    "damaging waves": "Marine & Coastal",
 
     # === AGRICULTURAL & ENVIRONMENTAL ===
     "air quality": "Agricultural & Environmental",
@@ -566,6 +590,8 @@ CATEGORY_MAPPING = {
     "emergency action notification": "Emergency & Civil Defense",
     "icy road": "Emergency & Civil Defense",
     "civil emergency message": "Emergency & Civil Defense",
+    "immediate evacuation": "Emergency & Civil Defense",
+    "water supply": "Emergency & Civil Defense",
 
     # === TEST & EXERCISE ===
     "drill": "Test & Exercise",
@@ -600,4 +626,7 @@ CATEGORY_MAPPING = {
     "issue": "Misc",
     "update": "Misc",
     "remove": "Misc",
+    "brand": "Misc",
+    "meteorological department curacao": "Misc",
+    "advisory": "Misc",
 }
