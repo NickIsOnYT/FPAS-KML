@@ -10,7 +10,7 @@
 
 - For it to connect, you may need to adjust your firewall. Here's how:
 
-1. Type `windows defender firewall` in the Windows search.
+1. Type `windows defender firewall` into Windows search.
 
 2. In the left-hand sidebar, click on Inbound Rules.
 
