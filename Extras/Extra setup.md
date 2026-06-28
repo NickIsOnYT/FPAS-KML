@@ -9,13 +9,15 @@
 2. Click on properties, then the refresh tab in the window that opened.
 3. Change the time-based refresh to be any interval you want. (I'd recommend setting it to `1 minute` for default use.)
 - Keep this in mind if you want to do anything below. When the list refreshes, Google Earth minimizes the folder, so I would recommend setting it to `Once` then refreshing manually for better tweaking.
+- Also, keep in mind that if your sync time is too low, it will cause syncing issues with Google Earth because it takes some time for it to refresh fully.
 
 
 ### Adjust the alert pulling frequency
 
 1. Open `app.py` in a text/code editor.
 2. Search for the line `time.sleep`. (it should be under `def background_alert_harvester():`)
-3. Change the number in the parentheses (`(15)`) to a different number. (Default is 15 seconds)
+3. Change the number in the parentheses (`(60)`) to a different number. (Default is 60 seconds)
+- Be careful, if you make the pulling frequency too low, you may get timed out by the FPAS server for requesting data too frequently.
 
 
 ### Adjust the alert area
@@ -26,6 +28,7 @@
 2. Search for `url = f"{API_BASE_URL}/alert/area?min_lat=-90&max_lat=90&min_lon=-180&max_lon=180"`
 3. Use Google Earth to get the coordinates you want. (in the bottom left, "lat" and "lon" values)
 4. Change the "min_lat=#", "max_lat=#", "min_lon=#" & "max_lon=#" to the desired values.
+
 
 ### How to update translations.py yourself
 
