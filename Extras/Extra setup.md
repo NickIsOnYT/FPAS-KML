@@ -7,7 +7,7 @@
 
 1. Open `app.py` in a text/code editor.
 2. Search for the line `time.sleep`. (it should be under `def background_alert_harvester():`)
-3. Change the number in the parentheses (`(300)`) to a different number. (Default is 300 seconds (5 minutes))
+3. Change the number in the parentheses (`(15)`) to a different number. (Default is 15 seconds)
 
 
 ### Adjust the alert area
