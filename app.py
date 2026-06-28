@@ -262,7 +262,7 @@ def background_alert_harvester():
         except Exception as e:
             print(f"[Background Thread] Error during harvesting: {e}", flush=True)
             
-        time.sleep(15)
+        time.sleep(60)
 
 @app.route('/alerts.kml')
 def serve_kml():

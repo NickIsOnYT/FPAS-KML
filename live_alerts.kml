@@ -6,6 +6,6 @@
     <Link>
       <href>http://localhost:5000/alerts.kml</href>
       <refreshMode>onInterval</refreshMode>
-      <refreshInterval>300</refreshInterval> </Link>
+      <refreshInterval>60</refreshInterval> </Link>
   </NetworkLink>
 </kml>
