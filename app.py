@@ -50,9 +50,10 @@ def load_local_disk_cache():
                     print(f"\n[Initialization] Failed to load cache file {filename}: {file_err}", flush=True)
                 
                 loaded_count += 1
-                percent = (loaded_count / total_files) * 100
-                sys.stdout.write(f"\r[Initialization] Progress: {percent:.1f}% ({loaded_count}/{total_files} completed)")
-                sys.stdout.flush()
+                if loaded_count % 50 == 0 or loaded_count == total_files:
+                    percent = (loaded_count / total_files) * 100
+                    sys.stdout.write(f"\r[Initialization] Progress: {percent:.1f}% ({loaded_count}/{total_files} completed)")
+                    sys.stdout.flush()
             print("", flush=True) 
             
         print(f"[Initialization] Loaded {len(ALERT_CACHE)} alerts from disk into memory successfully.", flush=True)
@@ -77,14 +78,13 @@ def kml_color_to_hex(kml_color_str):
     return "333333"
 
 def calculate_centroid_from_geometries(geometries):
-    """FIXED: Converts coordinate pairs to tuples to maintain hashability when reading from JSON disk cache."""
+    """Converts coordinate pairs to tuples to maintain hashability when reading from JSON disk cache."""
     all_coords = []
     for geom in geometries:
         all_coords.extend(geom["coords"])
     if not all_coords:
         return (0.0, 0.0)
     
-    # Cast elements to tuple handles both fresh in-memory pairs and loaded JSON arrays seamlessly
     unique_coords = list(set(tuple(c) for c in all_coords))
     avg_lon = sum(c[0] for c in unique_coords) / len(unique_coords)
     avg_lat = sum(c[1] for c in unique_coords) / len(unique_coords)
@@ -198,9 +198,6 @@ def background_alert_harvester():
     global ALERT_CACHE
     print("[Background Thread] Started alert harvester worker.", flush=True)
     
-    # Load local database from physical cache on application launch
-    load_local_disk_cache()
-    
     while True:
         try:
             print("\n[Background Thread] Syncing with global server...", flush=True)
@@ -221,8 +218,8 @@ def background_alert_harvester():
                             if os.path.exists(disk_path):
                                 try:
                                     os.remove(disk_path)
-                                except Exception as rm_err:
-                                    print(f"\n[Background Thread] Error removing expired cache file {cid}.json: {rm_err}", flush=True)
+                                except Exception:
+                                    pass
                 
                 new_ids = [aid for aid in active_ids if aid not in ALERT_CACHE]
                 total_new = len(new_ids)
@@ -240,21 +237,20 @@ def background_alert_harvester():
                                 disk_path = os.path.join(CACHE_DIR, f"{aid}.json")
                                 try:
                                     with open(disk_path, "w", encoding="utf-8") as f:
-                                        json.dump(data, f, ensure_ascii=False, indent=2)
-                                except Exception as wr_err:
-                                    print(f"\n[Background Thread] Error writing cache file {aid}.json: {wr_err}", flush=True)
+                                        json.dump(data, f, ensure_ascii=False)
+                                except Exception:
+                                    pass
                                 
                                 with cache_lock:
                                     ALERT_CACHE[aid] = data
                             
-                            percent = (processed_count / total_new) * 100
-                            sys.stdout.write(f"\r[Background Thread] Progress: {percent:.1f}% ({processed_count}/{total_new} completed)")
-                            sys.stdout.flush()
+                            if processed_count % 10 == 0 or processed_count == total_new:
+                                percent = (processed_count / total_new) * 100
+                                sys.stdout.write(f"\r[Background Thread] Progress: {percent:.1f}% ({processed_count}/{total_new} completed)")
+                                sys.stdout.flush()
                     print("", flush=True)
                                 
                 print(f"[Background Thread] Sync complete. Local database holds {len(ALERT_CACHE)} valid mapped alerts.", flush=True)
-                
-                # Dynamic Garbage Collection cleanup
                 gc.collect()
             else:
                 print(f"[Background Thread] API error ({r.status_code}), retrying later.", flush=True)
@@ -552,9 +548,17 @@ def serve_kml():
     return Response(output_kml_data, mimetype='application/vnd.google-earth.kml+xml')
 
 if __name__ == "__main__":
+    print("[Boot] Initializing system modules...", flush=True)
+    
+    # 1. Load disk files synchronously before doing anything else
+    load_local_disk_cache()
+    print("[Boot] System baseline ready.\n", flush=True)
+    
+    # 2. Now start the harvester background thread to watch for updates
     worker = threading.Thread(target=background_alert_harvester, daemon=True)
     worker.start()
     
+    # 3. Finally, start Flask (its banner will now print cleanly below your progress updates)
     print("Starting KML Presenter server on local network...", flush=True)
-    print("Google Earth url: http:ip-address:5000/alerts.kml", flush=True)
+    print("Google Earth url: http://localhost:5000/alerts.kml", flush=True)
     app.run(host='0.0.0.0', port=5000)
