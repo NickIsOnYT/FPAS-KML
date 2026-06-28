@@ -562,6 +562,7 @@ CATEGORY_MAPPING = {
     "wind wave advisory change": "Marine & Coastal",
     "wind wave advisory continue": "Marine & Coastal",
     "damaging waves": "Marine & Coastal",
+    "Wind, Rough Seas": "Marine & Coastal",
 
     # === AGRICULTURAL & ENVIRONMENTAL ===
     "air quality": "Agricultural & Environmental",
