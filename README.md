@@ -6,7 +6,7 @@ A Python application that harvests Common Alerting Protocol (CAP) data from `ale
 
 ### Requirements
 
-- The script uses around 500~ish MB of RAM.
+- The script uses a lot of RAM.
 - Google Earth with only the KML file open uses the cache amount of RAM set in the settings.
 - Just make sure your computer has enough RAM if you want to load all alerts into Google Earth.
 
