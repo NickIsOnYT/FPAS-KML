@@ -300,6 +300,12 @@ CATEGORY_MAPPING = {
     "narančasto upozorenje za vjetar": "Storms, Tornados, Floods & Winds",
     "tormentas fuertes con lluvias intensas - aviso naranja": "Storms, Tornados, Floods & Winds",
     "yellow rain warning": "Storms, Tornados, Floods & Winds",
+    "downpour": "Storms, Tornados, Floods & Winds",
+    "gale-force gusts": "Storms, Tornados, Floods & Winds",
+    "general flood advisory (final)": "Storms, Tornados, Floods & Winds",
+    "general flood advisory": "Storms, Tornados, Floods & Winds",
+    "moderate wind warning": "Storms, Tornados, Floods & Winds",
+    "rain flood": "Storms, Tornados, Floods & Winds",
 
     # === TEMPERATURE EXTREMES & WINTER ===
     "aviso de temperaturas máximas de nivel amarillo": "Temperature Extremes & Winter",
@@ -427,6 +433,17 @@ CATEGORY_MAPPING = {
     "moderate high temperature warning": "Temperature Extremes & Winter",
     "yellow high temperature": "Temperature Extremes & Winter",
     "yellow low-temperature warning": "Temperature Extremes & Winter",
+    "execssive heat": "Temperature Extremes & Winter",
+    "extreme high temperature warning": "Temperature Extremes & Winter",
+    "extremely high temperatures": "Temperature Extremes & Winter",
+    "freeze warning": "Temperature Extremes & Winter",
+    "high temperature red": "Temperature Extremes & Winter",
+    "high-temperature orange warning": "Temperature Extremes & Winter",
+    "high-temperature red warning": "Temperature Extremes & Winter",
+    "red high temperature warning": "Temperature Extremes & Winter",
+    "red high-temperature warning": "Temperature Extremes & Winter",
+    "severe heat": "Temperature Extremes & Winter",
+    "winter weather advisory": "Temperature Extremes & Winter",
 
     # === FIRE & SMOKE ===
     "awareness_type=9, awareness_level=1": "Fire & Smoke",
@@ -455,6 +472,13 @@ CATEGORY_MAPPING = {
     "火災": "Fire & Smoke",
     "maastopalovaroitus": "Fire & Smoke",
     "fire evacuations - deer canyon": "Fire & Smoke",
+    "grass fire": "Fire & Smoke",
+    "danger of fires": "Fire & Smoke",
+    "pocket fire": "Fire & Smoke",
+    "forest fire danger": "Fire & Smoke",
+    "interdiction de faire du feu": "Fire & Smoke",
+    "safety precautions forest fires": "Fire & Smoke",
+    "waldbrand": "Fire & Smoke",
 
     # === EARTHQUAKE, TSUNAMI & VOLCANO ===
     "avalanche": "Earthquake, Tsunami & Volcano",
@@ -557,6 +581,8 @@ CATEGORY_MAPPING = {
     "particle pollution": "Agricultural & Environmental",
     "health advisory": "Agricultural & Environmental",
     "falling object": "Agricultural & Environmental",
+    "pollution de l'eau": "Agricultural & Environmental",
+    "sécheresse": "Agricultural & Environmental",
 
     # === EMERGENCY & CIVIL DEFENSE ===
     "chemical": "Emergency & Civil Defense",

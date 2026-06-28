@@ -10,8 +10,8 @@ import sys
 import importlib  # Dynamic hot-reloading
 import math
 import gc         # Memory optimization
-import os         # Local directory path mapping
-import json       # Local disk alert persistence
+import os         # FIXED: Added for local directory path mapping
+import json       # FIXED: Added for local disk alert persistence
 
 # Import the module as an object so we can pass it to importlib.reload
 import translations
@@ -23,39 +23,28 @@ API_BASE_URL = "https://alerts.kde.org"
 ALERT_CACHE = {}
 cache_lock = threading.Lock()
 
-# Configure persistent local disk cache directory in AppData/Roaming
+# FIXED: Configure persistent local disk cache directory in AppData/Roaming
 CACHE_DIR = os.path.join(os.environ.get('APPDATA', os.path.expanduser('~')), 'FPAS_KML_Cache')
 os.makedirs(CACHE_DIR, exist_ok=True)
 
 def load_local_disk_cache():
-    """Scans files to determine the total count and renders an active progress counter in console."""
+    """FIXED: Scans the AppData folder on startup to pull all active alerts into memory."""
     global ALERT_CACHE
     print(f"[Initialization] Scanning local disk cache: {CACHE_DIR}", flush=True)
     try:
-        # Pre-filter files to discover the exact load queue size
-        json_files = [f for f in os.listdir(CACHE_DIR) if f.endswith(".json")]
-        total_files = len(json_files)
-        print(f"[Initialization] Found {total_files} cached alerts on disk to load.", flush=True)
-        
-        if total_files > 0:
-            loaded_count = 0
-            for filename in json_files:
+        count = 0
+        for filename in os.listdir(CACHE_DIR):
+            if filename.endswith(".json"):
                 file_path = os.path.join(CACHE_DIR, filename)
                 try:
                     with open(file_path, "r", encoding="utf-8") as f:
                         data = json.load(f)
                         if data and "id" in data:
                             ALERT_CACHE[data["id"]] = data
+                            count += 1
                 except Exception as file_err:
-                    print(f"\n[Initialization] Failed to load cache file {filename}: {file_err}", flush=True)
-                
-                loaded_count += 1
-                percent = (loaded_count / total_files) * 100
-                sys.stdout.write(f"\r[Initialization] Progress: {percent:.1f}% ({loaded_count}/{total_files} completed)")
-                sys.stdout.flush()
-            print("", flush=True) 
-            
-        print(f"[Initialization] Loaded {len(ALERT_CACHE)} alerts from disk into memory successfully.", flush=True)
+                    print(f"[Initialization] Failed to load cache file {filename}: {file_err}", flush=True)
+        print(f"[Initialization] Loaded {count} alerts from disk into memory successfully.", flush=True)
     except Exception as dir_err:
         print(f"[Initialization] Error accessing cache directory: {dir_err}", flush=True)
 
@@ -77,15 +66,13 @@ def kml_color_to_hex(kml_color_str):
     return "333333"
 
 def calculate_centroid_from_geometries(geometries):
-    """FIXED: Converts coordinate pairs to tuples to maintain hashability when reading from JSON disk cache."""
+    """Calculates a single global geographic center across a list of geometry coordinate blocks."""
     all_coords = []
     for geom in geometries:
         all_coords.extend(geom["coords"])
     if not all_coords:
         return (0.0, 0.0)
-    
-    # Cast elements to tuple handles both fresh in-memory pairs and loaded JSON arrays seamlessly
-    unique_coords = list(set(tuple(c) for c in all_coords))
+    unique_coords = list(set(all_coords))
     avg_lon = sum(c[0] for c in unique_coords) / len(unique_coords)
     avg_lat = sum(c[1] for c in unique_coords) / len(unique_coords)
     return (avg_lon, avg_lat)
@@ -198,7 +185,7 @@ def background_alert_harvester():
     global ALERT_CACHE
     print("[Background Thread] Started alert harvester worker.", flush=True)
     
-    # Load local database from physical cache on application launch
+    # FIXED: Load local database from physical cache on application launch
     load_local_disk_cache()
     
     while True:
@@ -216,7 +203,7 @@ def background_alert_harvester():
                     for cid in cached_ids:
                         if cid not in active_ids:
                             del ALERT_CACHE[cid]
-                            # Delete the physical .json file when an alert drops from active list
+                            # FIXED: Delete the physical .json file when an alert drops from active list
                             disk_path = os.path.join(CACHE_DIR, f"{cid}.json")
                             if os.path.exists(disk_path):
                                 try:
@@ -236,7 +223,7 @@ def background_alert_harvester():
                             aid, data = future.result()
                             processed_count += 1
                             if data:
-                                # Save newly downloaded alert to its individual local disk file
+                                # FIXED: Save newly downloaded alert to its individual local disk file
                                 disk_path = os.path.join(CACHE_DIR, f"{aid}.json")
                                 try:
                                     with open(disk_path, "w", encoding="utf-8") as f:
@@ -262,7 +249,7 @@ def background_alert_harvester():
         except Exception as e:
             print(f"[Background Thread] Error during harvesting: {e}", flush=True)
             
-        time.sleep(15)
+        time.sleep(300)
 
 @app.route('/alerts.kml')
 def serve_kml():

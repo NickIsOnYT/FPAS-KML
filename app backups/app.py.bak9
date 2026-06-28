@@ -7,11 +7,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 import time
 import sys
-import importlib  # Dynamic hot-reloading
+import importlib
 import math
-import gc         # Memory optimization
-import os         # Local directory path mapping
-import json       # Local disk alert persistence
 
 # Import the module as an object so we can pass it to importlib.reload
 import translations
@@ -22,42 +19,6 @@ API_BASE_URL = "https://alerts.kde.org"
 # Local database cache
 ALERT_CACHE = {}
 cache_lock = threading.Lock()
-
-# Configure persistent local disk cache directory in AppData/Roaming
-CACHE_DIR = os.path.join(os.environ.get('APPDATA', os.path.expanduser('~')), 'FPAS_KML_Cache')
-os.makedirs(CACHE_DIR, exist_ok=True)
-
-def load_local_disk_cache():
-    """Scans files to determine the total count and renders an active progress counter in console."""
-    global ALERT_CACHE
-    print(f"[Initialization] Scanning local disk cache: {CACHE_DIR}", flush=True)
-    try:
-        # Pre-filter files to discover the exact load queue size
-        json_files = [f for f in os.listdir(CACHE_DIR) if f.endswith(".json")]
-        total_files = len(json_files)
-        print(f"[Initialization] Found {total_files} cached alerts on disk to load.", flush=True)
-        
-        if total_files > 0:
-            loaded_count = 0
-            for filename in json_files:
-                file_path = os.path.join(CACHE_DIR, filename)
-                try:
-                    with open(file_path, "r", encoding="utf-8") as f:
-                        data = json.load(f)
-                        if data and "id" in data:
-                            ALERT_CACHE[data["id"]] = data
-                except Exception as file_err:
-                    print(f"\n[Initialization] Failed to load cache file {filename}: {file_err}", flush=True)
-                
-                loaded_count += 1
-                percent = (loaded_count / total_files) * 100
-                sys.stdout.write(f"\r[Initialization] Progress: {percent:.1f}% ({loaded_count}/{total_files} completed)")
-                sys.stdout.flush()
-            print("", flush=True) 
-            
-        print(f"[Initialization] Loaded {len(ALERT_CACHE)} alerts from disk into memory successfully.", flush=True)
-    except Exception as dir_err:
-        print(f"[Initialization] Error accessing cache directory: {dir_err}", flush=True)
 
 def get_kml_color(severity, alpha=150):
     alpha_hex = f'{alpha:02x}'
@@ -77,15 +38,13 @@ def kml_color_to_hex(kml_color_str):
     return "333333"
 
 def calculate_centroid_from_geometries(geometries):
-    """FIXED: Converts coordinate pairs to tuples to maintain hashability when reading from JSON disk cache."""
+    """Calculates a single global geographic center across a list of geometry coordinate blocks."""
     all_coords = []
     for geom in geometries:
         all_coords.extend(geom["coords"])
     if not all_coords:
         return (0.0, 0.0)
-    
-    # Cast elements to tuple handles both fresh in-memory pairs and loaded JSON arrays seamlessly
-    unique_coords = list(set(tuple(c) for c in all_coords))
+    unique_coords = list(set(all_coords))
     avg_lon = sum(c[0] for c in unique_coords) / len(unique_coords)
     avg_lat = sum(c[1] for c in unique_coords) / len(unique_coords)
     return (avg_lon, avg_lat)
@@ -163,22 +122,18 @@ def fetch_single_alert(alert_id):
                 
                 for circle_node in area.findall('{*}circle'):
                     if circle_node.text:
-                        parts = circle_node.text.strip().split()
-                        if parts and ',' in parts[0]:
+                        parts = circle_node.text.split()
+                        if parts:
                             lat, lon = parts[0].split(',')
-                            try:
-                                geometries.append({
-                                    "type": "circle",
-                                    "language": lang,
-                                    "event_title": local_event,
-                                    "location_name": area_desc,
-                                    "description": local_description,
-                                    "instruction": local_instruction,
-                                    "coords": [(float(lon), float(lat))],
-                                    "radius_meters": float(parts[1]) if len(parts) > 1 else 0.0
-                                })
-                            except ValueError:
-                                pass
+                            geometries.append({
+                                "type": "circle",
+                                "language": lang,
+                                "event_title": local_event,
+                                "location_name": area_desc,
+                                "description": local_description,
+                                "instruction": local_instruction,
+                                "coords": [(float(lon), float(lat))]
+                            })
         
         if geometries:
             return alert_id, {
@@ -198,9 +153,6 @@ def background_alert_harvester():
     global ALERT_CACHE
     print("[Background Thread] Started alert harvester worker.", flush=True)
     
-    # Load local database from physical cache on application launch
-    load_local_disk_cache()
-    
     while True:
         try:
             print("\n[Background Thread] Syncing with global server...", flush=True)
@@ -216,13 +168,6 @@ def background_alert_harvester():
                     for cid in cached_ids:
                         if cid not in active_ids:
                             del ALERT_CACHE[cid]
-                            # Delete the physical .json file when an alert drops from active list
-                            disk_path = os.path.join(CACHE_DIR, f"{cid}.json")
-                            if os.path.exists(disk_path):
-                                try:
-                                    os.remove(disk_path)
-                                except Exception as rm_err:
-                                    print(f"\n[Background Thread] Error removing expired cache file {cid}.json: {rm_err}", flush=True)
                 
                 new_ids = [aid for aid in active_ids if aid not in ALERT_CACHE]
                 total_new = len(new_ids)
@@ -236,14 +181,6 @@ def background_alert_harvester():
                             aid, data = future.result()
                             processed_count += 1
                             if data:
-                                # Save newly downloaded alert to its individual local disk file
-                                disk_path = os.path.join(CACHE_DIR, f"{aid}.json")
-                                try:
-                                    with open(disk_path, "w", encoding="utf-8") as f:
-                                        json.dump(data, f, ensure_ascii=False, indent=2)
-                                except Exception as wr_err:
-                                    print(f"\n[Background Thread] Error writing cache file {aid}.json: {wr_err}", flush=True)
-                                
                                 with cache_lock:
                                     ALERT_CACHE[aid] = data
                             
@@ -253,16 +190,13 @@ def background_alert_harvester():
                     print("", flush=True)
                                 
                 print(f"[Background Thread] Sync complete. Local database holds {len(ALERT_CACHE)} valid mapped alerts.", flush=True)
-                
-                # Dynamic Garbage Collection cleanup
-                gc.collect()
             else:
                 print(f"[Background Thread] API error ({r.status_code}), retrying later.", flush=True)
                 
         except Exception as e:
             print(f"[Background Thread] Error during harvesting: {e}", flush=True)
             
-        time.sleep(15)
+        time.sleep(300)
 
 @app.route('/alerts.kml')
 def serve_kml():
@@ -276,8 +210,10 @@ def serve_kml():
     kml = simplekml.Kml()
     
     with cache_lock:
+        # Sort cache descending (reverse=True) so the most recent effective alerts appear first
         cached_alerts = sorted(list(ALERT_CACHE.values()), key=lambda x: x.get("raw_effective", ""), reverse=True)
         
+    # We will track active items here to build folders dynamically later
     active_categories_and_subs = {} 
     rendered_polygon_fingerprints = set()
     geolocated_pin_buckets = {}
@@ -285,7 +221,14 @@ def serve_kml():
     for item in cached_alerts:
         kml_color = get_kml_color(item["severity"])
         raw_event = str(item.get("event_type", "Alert")).strip()
+        lookup_event = raw_event.lower()
+        specific_alert_name = raw_event.title() if raw_event else "Active Alert"
         
+        if lookup_event in translations.CATEGORY_MAPPING:
+            category_name = translations.CATEGORY_MAPPING[lookup_event]
+        else:
+            category_name = "Uncategorized Alerts"
+            
         cap_data_url = f"{API_BASE_URL}/alert/{item['id']}"
         effective_str = item.get("effective", "N/A")
         expires_str = item.get("expires", "N/A")
@@ -293,7 +236,7 @@ def serve_kml():
         data_groups = {}
 
         for geom in item.get("geometries", []):
-            event_title = geom.get("event_title", raw_event).title()
+            event_title = geom.get("event_title", specific_alert_name).title()
             desc_text = geom.get("description", "No description available.").strip()
             inst_text = geom.get("instruction", "").strip()
             loc_name = geom.get("location_name", "Unknown Location")
@@ -340,24 +283,12 @@ def serve_kml():
                 raw_lon, raw_lat = calculate_centroid_from_geometries(pin_data["geoms"])
                 coord_bucket = (round(raw_lon, 5), round(raw_lat, 5))
                 
-                target_subcategory_string = str(pin_data['title']).strip()
-                lookup_event = target_subcategory_string.lower()
-                
-                if lookup_event in translations.CATEGORY_MAPPING:
-                    category_name = translations.CATEGORY_MAPPING[lookup_event]
-                else:
-                    base_lookup = raw_event.lower()
-                    if base_lookup in translations.CATEGORY_MAPPING:
-                        category_name = translations.CATEGORY_MAPPING[base_lookup]
-                    else:
-                        category_name = "Uncategorized Alerts"
-                
                 if coord_bucket not in geolocated_pin_buckets:
                     geolocated_pin_buckets[coord_bucket] = []
                     
                 geolocated_pin_buckets[coord_bucket].append({
                     "category": category_name,
-                    "subcategory": target_subcategory_string,
+                    "subcategory": specific_alert_name,
                     "title": pin_data['title'],
                     "loc_name": loc_name,
                     "severity": str(item.get("severity", "Unknown")).upper(),
@@ -370,15 +301,13 @@ def serve_kml():
                     "raw_lat": raw_lat,
                     "geoms": pin_data["geoms"]
                 })
+                
+                # Track exactly which categories and subcategories have actual data entries
+                if category_name not in active_categories_and_subs:
+                    active_categories_and_subs[category_name] = set()
+                active_categories_and_subs[category_name].add(specific_alert_name)
 
-    for coord_bucket, stacked_pins in geolocated_pin_buckets.items():
-        lead_pin = stacked_pins[0]
-        c_name = lead_pin["category"]
-        s_name = lead_pin["subcategory"]
-        if c_name not in active_categories_and_subs:
-            active_categories_and_subs[c_name] = set()
-        active_categories_and_subs[c_name].add(s_name)
-
+    # FIXED: Generate folders dynamically ONLY for categories that actually have active alerts
     category_folders = {}
     subcategory_folders = {}
     
@@ -391,6 +320,7 @@ def serve_kml():
             sub_folder_key = (cat_name, sub_name)
             subcategory_folders[sub_folder_key] = category_folders[cat_name].newfolder(name=sub_name)
 
+    # Render points and shapes to their target folders
     for coord_bucket, stacked_pins in geolocated_pin_buckets.items():
         lead_pin = stacked_pins[0]
         target_folder = subcategory_folders[(lead_pin["category"], lead_pin["subcategory"])]
@@ -541,15 +471,7 @@ def serve_kml():
                         pol.style.balloonstyle.text = "$[description]"
                         pol.style.balloonstyle.bgcolor = "ffffffff"
         
-    output_kml_data = kml.kml()
-    
-    del kml
-    del category_folders
-    del subcategory_folders
-    del geolocated_pin_buckets
-    gc.collect()  # Forces immediate cleanup of simplekml reference chains
-    
-    return Response(output_kml_data, mimetype='application/vnd.google-earth.kml+xml')
+    return Response(kml.kml(), mimetype='application/vnd.google-earth.kml+xml')
 
 if __name__ == "__main__":
     worker = threading.Thread(target=background_alert_harvester, daemon=True)
