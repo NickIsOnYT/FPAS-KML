@@ -300,100 +300,43 @@ def serve_kml():
             data_groups[group_key].append(geom)
 
         for (event_title, loc_name), geoms in data_groups.items():
-            desc_groups = {}
-            for g in geoms:
-                g_lang = g['language'].upper()
-                g_title = g.get('event_title', raw_event).title()
-                g_desc = g.get('description', 'No description available.').strip()
-                g_inst = g.get('instruction', '').strip()
-                
-                if g_desc not in desc_groups:
-                    desc_groups[g_desc] = {
-                        "title": g_title,
-                        "langs": set(),
-                        "instructions": {}, 
-                        "geoms": []
-                    }
-                
-                desc_groups[g_desc]["langs"].add(g_lang)
-                desc_groups[g_desc]["geoms"].append(g)
-                if g_inst:
-                    if g_inst not in desc_groups[g_desc]["instructions"]:
-                        desc_groups[g_desc]["instructions"][g_inst] = set()
-                    desc_groups[g_desc]["instructions"][g_inst].add(g_lang)
+            en_geoms = [g for g in geoms if 'en' in g['language'].lower()]
+            fr_geoms = [g for g in geoms if 'fr' in g['language'].lower()]
 
             pins_to_create = []
 
-            for desc_text, info in desc_groups.items():
-                body = f"<p>{desc_text}</p>"
-                
-                if info["instructions"]:
-                    body += "<h4>Instructions:</h4>"
-                    
-                    inst_list = list(info["instructions"].keys())
-                    common_suffix = ""
-                    
-                    if len(inst_list) > 1:
-                        # Determine the maximum common trailing string length
-                        reversed_strings = [s[::-1] for s in inst_list]
-                        min_len = min(len(s) for s in reversed_strings)
-                        suffix_len = 0
-                        for i in range(min_len):
-                            if len(set(s[i] for s in reversed_strings)) == 1:
-                                suffix_len += 1
-                            else:
-                                break
-                        
-                        if suffix_len > 0:
-                            raw_suffix = inst_list[0][-suffix_len:]
-                            
-                            # Verify if the match naturally aligns with a whole-word boundary
-                            clean_start = True
-                            for s in inst_list:
-                                boundary_idx = len(s) - suffix_len
-                                if boundary_idx > 0 and s[boundary_idx - 1] not in [" ", "\n", "\r", "\t", ".", "!", "?", ",", ";"]:
-                                    clean_start = False
-                                    break
-                            
-                            if clean_start:
-                                common_suffix = raw_suffix
-                            else:
-                                # Safe clip fallback: step forward to the next whitespace boundary to drop partial fragments
-                                first_break = min([raw_suffix.find(c) for c in [" ", "\n"] if raw_suffix.find(c) != -1], default=-1)
-                                if first_break != -1:
-                                    common_suffix = raw_suffix[first_break:]
-                                else:
-                                    common_suffix = raw_suffix
-                    
-                    # Render language-specific items minus the global boilerplate footer text
-                    for inst_text, inst_langs in sorted(info["instructions"].items()):
-                        inst_lang_label = "/".join(sorted(list(inst_langs)))
-                        
-                        display_text = inst_text
-                        if common_suffix and display_text.endswith(common_suffix):
-                            display_text = display_text[:-len(common_suffix)].strip()
-                            
-                        if display_text:
-                            display_text = display_text.replace("\n", "<br/>")
-                            body += f"<p><b>({inst_lang_label}):</b> {display_text}</p>"
-                    
-                    # Place the clean, unified common block once at the absolute bottom
-                    if common_suffix and common_suffix.strip():
-                        clean_suffix = common_suffix.strip().replace("\n", "<br/>")
-                        body += f"<hr style='border:0; border-top:1px dotted #ccc;'/><p>{clean_suffix}</p>"
-                
-                pins_to_create.append({
-                    "title": info['title'],  
-                    "base_title": info['title'],
-                    "body": body,
-                    "geoms": info["geoms"]
-                })
+            if en_geoms and fr_geoms:
+                en_desc = en_geoms[0].get('description', 'No description available.').strip()
+                en_inst = en_geoms[0].get('instruction', '').strip()
+                fr_desc = fr_geoms[0].get('description', 'No description available.').strip()
+                fr_inst = fr_geoms[0].get('instruction', '').strip()
+
+                if en_desc != fr_desc or en_inst != fr_inst:
+                    en_body = f"<h4>{event_title}</h4><p>{en_desc}</p>"
+                    if en_inst: en_body += f"<h5>Instructions:</h5><p>{en_inst}</p>"
+                    fr_body = f"<h4>{fr_geoms[0]['event_title'].title()}</h4><p>{fr_desc}</p>"
+                    if fr_inst: fr_body += f"<h5>Instructions:</h5><p>{fr_inst}</p>"
+
+                    pins_to_create.append({"title": f"{event_title} (EN)", "body": en_body, "geoms": en_geoms})
+                    pins_to_create.append({"title": f"{event_title} (FR)", "body": fr_body, "geoms": fr_geoms})
+                else:
+                    combined_body = f"<p>{en_desc}</p>"
+                    if en_inst: combined_body += f"<h4>Instructions:</h4><p>{en_inst}</p>"
+                    pins_to_create.append({"title": event_title, "body": combined_body, "geoms": geoms})
+            else:
+                active_geoms = en_geoms if en_geoms else fr_geoms
+                if active_geoms:
+                    fallback_desc = active_geoms[0].get('description', 'No description available.').strip()
+                    fallback_inst = active_geoms[0].get('instruction', '').strip()
+                    fallback_body = f"<p>{fallback_desc}</p>"
+                    if fallback_inst: fallback_body += f"<h4>Instructions:</h4><p>{fallback_inst}</p>"
+                    pins_to_create.append({"title": event_title, "body": fallback_body, "geoms": active_geoms})
 
             for pin_data in pins_to_create:
                 raw_lon, raw_lat = calculate_centroid_from_geometries(pin_data["geoms"])
                 coord_bucket = (round(raw_lon, 5), round(raw_lat, 5))
                 
-                target_subcategory_string = str(pin_data['base_title']).strip()
+                target_subcategory_string = str(pin_data['title']).strip()
                 lookup_event = target_subcategory_string.lower()
                 
                 if lookup_event in translations.CATEGORY_MAPPING:
@@ -600,7 +543,7 @@ def serve_kml():
     del category_folders
     del subcategory_folders
     del geolocated_pin_buckets
-    gc.collect()  
+    gc.collect()  # Forces immediate cleanup of simplekml reference chains
     
     return Response(output_kml_data, mimetype='application/vnd.google-earth.kml+xml')
 

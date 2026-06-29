@@ -357,11 +357,6 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "fog level 1": "Storms, Tornados, Floods & Winds",
     "fog level 2": "Storms, Tornados, Floods & Winds",
     "fog level 3": "Storms, Tornados, Floods & Winds",
-    "vientos fuertes": "Storms, Tornados, Floods & Winds",
-    "styrtregn": "Storms, Tornados, Floods & Winds",
-    "regn": "Storms, Tornados, Floods & Winds",
-    "aviso de vientos de nivel amarillo": "Storms, Tornados, Floods & Winds",
-    "żółty alert na burze": "Storms, Tornados, Floods & Winds",
 
     # === TEMPERATURE EXTREMES ===
     "aviso de temperaturas máximas de nivel amarillo": "Temperature Extremes",
@@ -468,16 +463,6 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "red high temperature warning": "Temperature Extremes",
     "red high-temperature warning": "Temperature Extremes",
     "severe heat": "Temperature Extremes",
-    "горещо": "Temperature Extremes",
-    "yellow høje temperaturer": "Temperature Extremes",
-    "visoka temperatura - ekstremna ogroženost": "Temperature Extremes",
-    "piros hőség figyelmeztetés": "Temperature Extremes",
-    "kaitra": "Temperature Extremes",
-    "hellevaroitus": "Temperature Extremes",
-    "extrémně vysoké teploty": "Temperature Extremes",
-    "czerwony alert na upał": "Temperature Extremes",
-    "crveno upozorenje za vrućinu": "Temperature Extremes",
-    "bajas temperaturas": "Temperature Extremes",
 
     # === WINTER WEATHER ===
     "awareness_type=6, awareness_level=1": "Winter Weather",
@@ -550,12 +535,6 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "interdiction de faire du feu": "Fire & Smoke",
     "safety precautions forest fires": "Fire & Smoke",
     "waldbrand": "Fire & Smoke",
-    "vorsorgeempfehlungen waldbrand": "Fire & Smoke",
-    "skogbrannfare": "Fire & Smoke",
-    "nebezpečí požárů": "Fire & Smoke",
-    "incendio": "Fire & Smoke",
-    "feuerverbot": "Fire & Smoke",
-    "divieto di accendere fuochi": "Fire & Smoke",
 
     # === EARTHQUAKE, TSUNAMI & VOLCANO ===
     "avalanche": "Earthquake, Tsunami & Volcano",
@@ -641,7 +620,6 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "damaging waves": "Marine & Coastal",
     "wind, rough seas": "Marine & Coastal",
     "low water": "Marine & Coastal",
-    "oleaje en el caribe": "Marine & Coastal",
 
     # === AGRICULTURAL & ENVIRONMENTAL ===
     "air quality": "Agricultural & Environmental",
@@ -664,10 +642,6 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "pollution de l'eau": "Agricultural & Environmental",
     "sécheresse": "Agricultural & Environmental",
     "uv advisory": "Agricultural & Environmental",
-    "qualité de l'air": "Agricultural & Environmental",
-    "gewässerverunreinigung": "Agricultural & Environmental",
-    "water pollution": "Agricultural & Environmental",
-    "baixa umidade": "Agricultural & Environmental",
 
     # === EMERGENCY & CIVIL DEFENSE ===
     "chemical": "Emergency & Civil Defense",
@@ -701,7 +675,6 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "civil emergency message": "Emergency & Civil Defense",
     "immediate evacuation": "Emergency & Civil Defense",
     "water supply": "Emergency & Civil Defense",
-    "道路封閉": "Emergency & Civil Defense",
 
     # === AMBER ALERTS ===
     "amber alert": "Amber Alerts",
