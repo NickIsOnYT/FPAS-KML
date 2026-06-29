@@ -367,6 +367,7 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "淹水": "Storms, Tornados, Floods & Winds",
     "extremely heavy rain": "Storms, Tornados, Floods & Winds",
     "lightning, hailstorm, gusty winds, and thunderstorm": "Storms, Tornados, Floods & Winds",
+    "schweres gewitter mit extrem heftigem starkregen und hagel": "Storms, Tornados, Floods & Winds",
 
     # === TEMPERATURE EXTREMES ===
     "aviso de temperaturas máximas de nivel amarillo": "Temperature Extremes",
@@ -715,6 +716,7 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "evacuate": "Emergency & Civil Defense",
     "pre evacuate": "Emergency & Civil Defense",
     "pre-evacuate": "Emergency & Civil Defense",
+    "police activity": "Emergency & Civil Defense",
 
 
     # === AMBER ALERTS ===
