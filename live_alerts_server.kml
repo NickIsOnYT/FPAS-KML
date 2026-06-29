@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="">
+  <NetworkLink>
+    <name>FOSS Live Alerts</name>
+    <refreshVisibility>1</refreshVisibility>
+    <Link>
+      <href>http://10.0.0.212:5000/alerts.kml</href>
+      <refreshMode>onInterval</refreshMode>
+      <refreshInterval>60</refreshInterval> </Link>
+  </NetworkLink>
+</kml>
