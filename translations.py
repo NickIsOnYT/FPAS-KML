@@ -362,6 +362,12 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "regn": "Storms, Tornados, Floods & Winds",
     "aviso de vientos de nivel amarillo": "Storms, Tornados, Floods & Winds",
     "żółty alert na burze": "Storms, Tornados, Floods & Winds",
+    "dense fog advisory": "Storms, Tornados, Floods & Winds",
+    "dense fog warning": "Storms, Tornados, Floods & Winds",
+    "widespread heavy thunderstorms possible": "Storms, Tornados, Floods & Winds",
+    "widespread heavy thunderstorms": "Storms, Tornados, Floods & Winds",
+    "淹水": "Storms, Tornados, Floods & Winds",
+    "extremely heavy rain": "Storms, Tornados, Floods & Winds",
 
     # === TEMPERATURE EXTREMES ===
     "aviso de temperaturas máximas de nivel amarillo": "Temperature Extremes",
@@ -478,6 +484,7 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "czerwony alert na upał": "Temperature Extremes",
     "crveno upozorenje za vrućinu": "Temperature Extremes",
     "bajas temperaturas": "Temperature Extremes",
+    "declínio de temperatura": "Temperature Extremes",
 
     # === WINTER WEATHER ===
     "awareness_type=6, awareness_level=1": "Winter Weather",
@@ -556,6 +563,7 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "incendio": "Fire & Smoke",
     "feuerverbot": "Fire & Smoke",
     "divieto di accendere fuochi": "Fire & Smoke",
+    "aspen acres wildland fire": "Fire & Smoke",
 
     # === EARTHQUAKE, TSUNAMI & VOLCANO ===
     "avalanche": "Earthquake, Tsunami & Volcano",
@@ -591,6 +599,8 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "селевая опасность": "Earthquake, Tsunami & Volcano",
     "landslip warning": "Earthquake, Tsunami & Volcano",
     "geologic hazard": "Earthquake, Tsunami & Volcano",
+    "jordskred": "Earthquake, Tsunami & Volcano",
+    "landslide": "Earthquake, Tsunami & Volcano",
 
     # === MARINE & COASTAL ===
     "aallokkovaroitus": "Marine & Coastal",
@@ -642,6 +652,7 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "wind, rough seas": "Marine & Coastal",
     "low water": "Marine & Coastal",
     "oleaje en el caribe": "Marine & Coastal",
+    "ventos costeiros": "Marine & Coastal",
 
     # === AGRICULTURAL & ENVIRONMENTAL ===
     "air quality": "Agricultural & Environmental",
@@ -702,6 +713,10 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "immediate evacuation": "Emergency & Civil Defense",
     "water supply": "Emergency & Civil Defense",
     "道路封閉": "Emergency & Civil Defense",
+    "evacuate": "Emergency & Civil Defense",
+    "pre evacuate": "Emergency & Civil Defense",
+    "pre-evacuate": "Emergency & Civil Defense",
+
 
     # === AMBER ALERTS ===
     "amber alert": "Amber Alerts",
@@ -721,6 +736,7 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "tests": "Test & Exercise",
     "required monthly test": "Test & Exercise",
     "demo warning": "Test & Exercise",
+    "practice/demo warning": "Test & Exercise",
 
     # === MISC ===
     "anderes ereignis": "Misc",
@@ -742,4 +758,5 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "brand": "Misc",
     "meteorological department curacao": "Misc",
     "advisory": "Misc",
+    "météo": "Misc",
 })
