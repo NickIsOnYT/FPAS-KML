@@ -368,6 +368,26 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "extremely heavy rain": "Storms, Tornados, Floods & Winds",
     "lightning, hailstorm, gusty winds, and thunderstorm": "Storms, Tornados, Floods & Winds",
     "schweres gewitter mit extrem heftigem starkregen und hagel": "Storms, Tornados, Floods & Winds",
+    "schweres gewitter mit heftigem starkregen": "Storms, Tornados, Floods & Winds",
+    "active winds": "Storms, Tornados, Floods & Winds",
+    "moderate rains": "Storms, Tornados, Floods & Winds",
+    "raised dust": "Storms, Tornados, Floods & Winds",
+    "أتربة مثارة": "Storms, Tornados, Floods & Winds",
+    "أمطار خفيفة": "Storms, Tornados, Floods & Winds",
+    "أمطار متوسطة": "Storms, Tornados, Floods & Winds",
+    "رياح نشطة": "Storms, Tornados, Floods & Winds",
+    "výstraha pred vetrom": "Storms, Tornados, Floods & Winds",
+    "general flood advisory (extreme)": "Storms, Tornados, Floods & Winds",
+    "narančasto upozorenje za grmljavinsku oluju": "Storms, Tornados, Floods & Winds",
+    "strong rainfall": "Storms, Tornados, Floods & Winds",
+    "thunderstorm, gusty winds": "Storms, Tornados, Floods & Winds",
+    "thunderstorm, heavy rain": "Storms, Tornados, Floods & Winds",
+    "żółty alert na silny deszcz z burzami": "Storms, Tornados, Floods & Winds",
+    "high winds": "Storms, Tornados, Floods & Winds",
+    "رياح شديدة": "Storms, Tornados, Floods & Winds",
+    "thunderstorm wind": "Storms, Tornados, Floods & Winds",
+    "regenwarnung": "Storms, Tornados, Floods & Winds",
+    "rain yellow warning": "Storms, Tornados, Floods & Winds",
 
     # === TEMPERATURE EXTREMES ===
     "aviso de temperaturas máximas de nivel amarillo": "Temperature Extremes",
@@ -485,6 +505,9 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "crveno upozorenje za vrućinu": "Temperature Extremes",
     "bajas temperaturas": "Temperature Extremes",
     "declínio de temperatura": "Temperature Extremes",
+    "temperaturas  y sensación térmica elevadas": "Temperature Extremes",
+    "narancs hőség figyelmeztetés": "Temperature Extremes",
+    "موجة حارة": "Temperature Extremes",
 
     # === WINTER WEATHER ===
     "awareness_type=6, awareness_level=1": "Winter Weather",
@@ -522,6 +545,7 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "winter storm watch": "Winter Weather",
     "winter weather advisory": "Winter Weather",
     "заморозки": "Winter Weather",
+    "heladas intensas": "Winter Weather",
 
     # === FIRE & SMOKE ===
     "awareness_type=9, awareness_level=1": "Fire & Smoke",
@@ -564,6 +588,7 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "feuerverbot": "Fire & Smoke",
     "divieto di accendere fuochi": "Fire & Smoke",
     "aspen acres wildland fire": "Fire & Smoke",
+    "großbrand": "Fire & Smoke",
 
     # === EARTHQUAKE, TSUNAMI & VOLCANO ===
     "avalanche": "Earthquake, Tsunami & Volcano",
@@ -653,6 +678,8 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "low water": "Marine & Coastal",
     "oleaje en el caribe": "Marine & Coastal",
     "ventos costeiros": "Marine & Coastal",
+    "أمواج مرتفعة": "Marine & Coastal",
+    "vientos y oleajes en el caribe panameño": "Marine & Coastal",
 
     # === AGRICULTURAL & ENVIRONMENTAL ===
     "air quality": "Agricultural & Environmental",
@@ -679,6 +706,8 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "gewässerverunreinigung": "Agricultural & Environmental",
     "water pollution": "Agricultural & Environmental",
     "baixa umidade": "Agricultural & Environmental",
+    "trockenheit": "Agricultural & Environmental",
+    "drinking water": "Agricultural & Environmental",
 
     # === EMERGENCY & CIVIL DEFENSE ===
     "chemical": "Emergency & Civil Defense",
@@ -717,7 +746,8 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "pre evacuate": "Emergency & Civil Defense",
     "pre-evacuate": "Emergency & Civil Defense",
     "police activity": "Emergency & Civil Defense",
-
+    "evac rye": "Emergency & Civil Defense",
+    "mandatory evacuation for beulah": "Emergency & Civil Defense",
 
     # === AMBER ALERTS ===
     "amber alert": "Amber Alerts",
@@ -738,6 +768,8 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "required monthly test": "Test & Exercise",
     "demo warning": "Test & Exercise",
     "practice/demo warning": "Test & Exercise",
+    "monthly system test": "Test & Exercise",
+    "weekly eas test": "Test & Exercise",
 
     # === Multi-Purpose ===
     "weather": "Multi-Purpose",
