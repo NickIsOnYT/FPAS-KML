@@ -12,6 +12,8 @@ import math
 import gc         # Memory optimization
 import os         # Local directory path mapping
 import json       # Local disk alert persistence
+import re         # Detect links in alert text
+import html       # Escape popup link content safely
 
 # Import the module as an object so we can pass it to importlib.reload
 import translations
@@ -102,6 +104,57 @@ def format_cap_timestamp(ts_str):
         pass
     return ts_str
 
+
+def extract_links_from_text(text):
+    """Extracts basic http/https and www links from CAP text fields."""
+    if not text:
+        return []
+
+    links = []
+    seen = set()
+    for match in re.finditer(r'(?i)\b(?:https?://|www\.)[^\s<>"\']+', text):
+        raw_link = match.group(0).rstrip(".,;:!?)]")
+        if raw_link.endswith(")") and raw_link.count("(") < raw_link.count(")"):
+            raw_link = raw_link[:-1]
+
+        full_url = raw_link if "://" in raw_link else f"https://{raw_link}"
+        if full_url not in seen:
+            seen.add(full_url)
+            links.append((raw_link, full_url))
+
+    return links
+
+
+def build_sources_html(title, cap_url, body_text, extra_links=None):
+    """Builds a simple Sources HTML block with the CAP JSON link plus discovered URLs."""
+    items = [
+        f'<div><b>{html.escape(title)}:</b> <a href="{html.escape(cap_url, quote=True)}">View CAP JSON</a></div>'
+    ]
+
+    seen_urls = set()
+    for source in extra_links or []:
+        # Account for JSON lists breaking tuple structures during disk load conversions
+        if isinstance(source, (tuple, list)) and len(source) >= 2:
+            display_text, full_url = source[0], source[1]
+        else:
+            display_text, full_url = source, source
+
+        if full_url and isinstance(full_url, str) and full_url not in seen_urls:
+            seen_urls.add(full_url)
+            items.append(
+                f'<div><a href="{html.escape(full_url, quote=True)}">{html.escape(str(display_text))}</a></div>'
+            )
+
+    for display_text, full_url in extract_links_from_text(body_text):
+        if full_url not in seen_urls:
+            seen_urls.add(full_url)
+            items.append(
+                f'<div><a href="{html.escape(full_url, quote=True)}">{html.escape(display_text)}</a></div>'
+            )
+
+    return "".join(items)
+
+
 def fetch_single_alert(alert_id):
     try:
         r = requests.get(f"{API_BASE_URL}/alert/{alert_id}", timeout=5)
@@ -127,6 +180,19 @@ def fetch_single_alert(alert_id):
             
             base_description = info_block.findtext('{*}description', 'No description.').strip()
             local_instruction = info_block.findtext('{*}instruction', '').strip()
+
+            info_links = []
+            for link_field in ['web', 'contact']:
+                link_value = info_block.findtext(f'{{*}}{link_field}', '').strip()
+                for display_text, full_url in extract_links_from_text(link_value):
+                    if full_url not in {u for _, u in info_links}:
+                        info_links.append((display_text, full_url))
+
+            for resource in info_block.findall('{*}resource'):
+                uri_value = resource.findtext('{*}uri', '').strip()
+                for display_text, full_url in extract_links_from_text(uri_value):
+                    if full_url not in {u for _, u in info_links}:
+                        info_links.append((display_text, full_url))
             
             cmam_long = None
             cmam_short = None
@@ -158,6 +224,7 @@ def fetch_single_alert(alert_id):
                                 "location_name": area_desc,
                                 "description": local_description,
                                 "instruction": local_instruction,
+                                "links": info_links,
                                 "coords": current_poly_coords
                             })
                 
@@ -174,6 +241,7 @@ def fetch_single_alert(alert_id):
                                     "location_name": area_desc,
                                     "description": local_description,
                                     "instruction": local_instruction,
+                                    "links": info_links,
                                     "coords": [(float(lon), float(lat))],
                                     "radius_meters": float(parts[1]) if len(parts) > 1 else 0.0
                                 })
@@ -312,11 +380,15 @@ def serve_kml():
                         "title": g_title,
                         "langs": set(),
                         "instructions": {}, 
-                        "geoms": []
+                        "geoms": [],
+                        "links": []
                     }
                 
                 desc_groups[g_desc]["langs"].add(g_lang)
                 desc_groups[g_desc]["geoms"].append(g)
+                for link in g.get("links", []):
+                    if link not in desc_groups[g_desc]["links"]:
+                        desc_groups[g_desc]["links"].append(link)
                 if g_inst:
                     if g_inst not in desc_groups[g_desc]["instructions"]:
                         desc_groups[g_desc]["instructions"][g_inst] = set()
@@ -386,6 +458,7 @@ def serve_kml():
                     "title": info['title'],  
                     "base_title": info['title'],
                     "body": body,
+                    "links": info.get("links", []),
                     "geoms": info["geoms"]
                 })
 
@@ -417,6 +490,7 @@ def serve_kml():
                     "effective": effective_str,
                     "expires": expires_str,
                     "body": pin_data['body'],
+                    "links": pin_data.get('links', []),
                     "url": cap_data_url,
                     "color": kml_color,
                     "raw_lon": raw_lon,
@@ -466,7 +540,7 @@ def serve_kml():
                 balloon_body_pieces.append(section)
                 
                 source_links_by_index.append(
-                    f'<li><b>#{idx} ({p["title"]}):</b> <a href="{p["url"]}">View CAP JSON</a></li>'
+                    build_sources_html(f"#{idx} ({p['title']})", p["url"], p["body"], p.get("links", []))
                 )
             
             sources_html = "".join(source_links_by_index)
@@ -477,9 +551,9 @@ def serve_kml():
             <hr/>
             {"".join(balloon_body_pieces)}
             <h4 style="margin-top:10px; margin-bottom:5px;">Sources:</h4>
-            <ul style="margin-top:0px; padding-left:20px; font-size:11px; color:#555555;">
+            <div style="margin-top:0px; padding-left:8px; font-size:11px; color:#555555;">
                 {sources_html}
-            </ul>
+            </div>
             """
         else:
             consolidated_title = lead_pin['title']
@@ -494,9 +568,9 @@ def serve_kml():
             {lead_pin['body']}
             <hr/>
             <h4 style="margin-bottom:5px;">Sources:</h4>
-            <p style="font-size: 11px; margin-top:0px; color: #555555;">
-                <b>{lead_pin['title']}:</b> <a href="{lead_pin['url']}">View CAP JSON Data</a>
-            </p>
+            <div style="margin-top:0px; padding-left:8px; font-size:11px; color:#555555;">
+                {build_sources_html(lead_pin['title'], lead_pin['url'], lead_pin['body'], lead_pin.get('links', []))}
+            </div>
             """
 
         reg = simplekml.Region()

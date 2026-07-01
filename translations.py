@@ -403,6 +403,7 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "windböen": "Storms, Tornados, Floods & Winds",
     "žuto upozorenje za kišu": "Storms, Tornados, Floods & Winds",
     "гръмотевични бури": "Storms, Tornados, Floods & Winds",
+    "sárga széllökés figyelmeztetés": "Storms, Tornados, Floods & Winds",
 
     # === TEMPERATURE EXTREMES ===
     "aviso de temperaturas máximas de nivel amarillo": "Temperature Extremes",
@@ -767,6 +768,8 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "north creek area evacuation": "Emergency & Civil Defense",
     "evac red creek aspen": "Emergency & Civil Defense",
     "zur eingeschränkten trinkwasserversorgung": "Emergency & Civil Defense",
+    "evac ccity": "Emergency & Civil Defense",
+    "evacuation order": "Emergency & Civil Defense",
 
     # === AMBER ALERTS ===
     "amber alert": "Amber Alerts",
