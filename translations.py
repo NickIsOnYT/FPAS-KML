@@ -390,6 +390,19 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "rain yellow warning": "Storms, Tornados, Floods & Winds",
     "gusty winds, thunderstorm": "Storms, Tornados, Floods & Winds",
     "rain thunderstorm": "Storms, Tornados, Floods & Winds",
+    "flash flood watch": "Storms, Tornados, Floods & Winds",
+    "gusty winds, heavy rain, and thunderstorm": "Storms, Tornados, Floods & Winds",
+    "heavy rain, gusty winds, and thunderstorm": "Storms, Tornados, Floods & Winds",
+    "lightning, thunder shower": "Storms, Tornados, Floods & Winds",
+    "moderate vent violent": "Storms, Tornados, Floods & Winds",
+    "precipitaciones fuertes": "Storms, Tornados, Floods & Winds",
+    "sturmböen": "Storms, Tornados, Floods & Winds",
+    "thunder shower": "Storms, Tornados, Floods & Winds",
+    "tormentas fuertes con rafagas y ocasional caida de granizo - aviso naranja": "Storms, Tornados, Floods & Winds",
+    "typhoon": "Storms, Tornados, Floods & Winds",
+    "windböen": "Storms, Tornados, Floods & Winds",
+    "žuto upozorenje za kišu": "Storms, Tornados, Floods & Winds",
+    "гръмотевични бури": "Storms, Tornados, Floods & Winds",
 
     # === TEMPERATURE EXTREMES ===
     "aviso de temperaturas máximas de nivel amarillo": "Temperature Extremes",
@@ -510,6 +523,7 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "temperaturas  y sensación térmica elevadas": "Temperature Extremes",
     "narancs hőség figyelmeztetés": "Temperature Extremes",
     "موجة حارة": "Temperature Extremes",
+    "aviso vermelho calor": "Temperature Extremes",
 
     # === WINTER WEATHER ===
     "awareness_type=6, awareness_level=1": "Winter Weather",
@@ -751,6 +765,8 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "evac rye": "Emergency & Civil Defense",
     "mandatory evacuation for beulah": "Emergency & Civil Defense",
     "north creek area evacuation": "Emergency & Civil Defense",
+    "evac red creek aspen": "Emergency & Civil Defense",
+    "zur eingeschränkten trinkwasserversorgung": "Emergency & Civil Defense",
 
     # === AMBER ALERTS ===
     "amber alert": "Amber Alerts",
