@@ -2,7 +2,7 @@
 
 A Python application that harvests Common Alerting Protocol (CAP) data from `alerts.kde.org`, processes it into a localized memory cache + disk storage, and streams custom KML files to Google Earth Pro.
 
-(Script made with Google Gemini)
+(Vibecoded script)
 
 ### Requirements
 
