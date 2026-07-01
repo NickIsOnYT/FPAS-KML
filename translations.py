@@ -388,6 +388,8 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "thunderstorm wind": "Storms, Tornados, Floods & Winds",
     "regenwarnung": "Storms, Tornados, Floods & Winds",
     "rain yellow warning": "Storms, Tornados, Floods & Winds",
+    "gusty winds, thunderstorm": "Storms, Tornados, Floods & Winds",
+    "rain thunderstorm": "Storms, Tornados, Floods & Winds",
 
     # === TEMPERATURE EXTREMES ===
     "aviso de temperaturas máximas de nivel amarillo": "Temperature Extremes",
@@ -748,6 +750,7 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "police activity": "Emergency & Civil Defense",
     "evac rye": "Emergency & Civil Defense",
     "mandatory evacuation for beulah": "Emergency & Civil Defense",
+    "north creek area evacuation": "Emergency & Civil Defense",
 
     # === AMBER ALERTS ===
     "amber alert": "Amber Alerts",
