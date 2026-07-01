@@ -6,7 +6,7 @@ A Python application that harvests Common Alerting Protocol (CAP) data from `ale
 
 ### Requirements
 
-- The script uses a lot of RAM. (16 GB recommended)
+- The script uses quite a bit of RAM. (approx 1.3~GB)
 - Just make sure your computer has enough RAM if you want to load all alerts into Google Earth.
 
 ## Setup and Installation
