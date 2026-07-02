@@ -404,6 +404,14 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "žuto upozorenje za kišu": "Storms, Tornados, Floods & Winds",
     "гръмотевични бури": "Storms, Tornados, Floods & Winds",
     "sárga széllökés figyelmeztetés": "Storms, Tornados, Floods & Winds",
+    "moderate wind": "Storms, Tornados, Floods & Winds",
+    "tropical cyclone warning signal": "Storms, Tornados, Floods & Winds",
+    "vigilance jaune vent-violent": "Storms, Tornados, Floods & Winds",
+    "lightning, hailstorm, and thunderstorm": "Storms, Tornados, Floods & Winds",
+    "heavy rain warning": "Storms, Tornados, Floods & Winds",
+    "pomarańczowy alert na silny wiatr": "Storms, Tornados, Floods & Winds",
+    "výstraha pred vetrom na horách": "Storms, Tornados, Floods & Winds",
+    "żółty alert na silny wiatr": "Storms, Tornados, Floods & Winds",
 
     # === TEMPERATURE EXTREMES ===
     "aviso de temperaturas máximas de nivel amarillo": "Temperature Extremes",
@@ -525,6 +533,8 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "narancs hőség figyelmeztetés": "Temperature Extremes",
     "موجة حارة": "Temperature Extremes",
     "aviso vermelho calor": "Temperature Extremes",
+    "bajas temperaturas heladas": "Temperature Extremes",
+    "bajas temperaturas helada": "Temperature Extremes",
 
     # === WINTER WEATHER ===
     "awareness_type=6, awareness_level=1": "Winter Weather",
@@ -697,6 +707,7 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "ventos costeiros": "Marine & Coastal",
     "أمواج مرتفعة": "Marine & Coastal",
     "vientos y oleajes en el caribe panameño": "Marine & Coastal",
+    "low sea": "Marine & Coastal",
 
     # === AGRICULTURAL & ENVIRONMENTAL ===
     "air quality": "Agricultural & Environmental",
@@ -770,6 +781,10 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "zur eingeschränkten trinkwasserversorgung": "Emergency & Civil Defense",
     "evac ccity": "Emergency & Civil Defense",
     "evacuation order": "Emergency & Civil Defense",
+    "pueblo county alert: colorado city- evac": "Emergency & Civil Defense",
+    "red creek area evacuation": "Emergency & Civil Defense",
+    "shelter in place warning": "Emergency & Civil Defense",
+    "ausfall stromversorgung": "Emergency & Civil Defense",
 
     # === AMBER ALERTS ===
     "amber alert": "Amber Alerts",
