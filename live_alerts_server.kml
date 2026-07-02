@@ -4,7 +4,7 @@
     <name>FOSS Live Alerts</name>
     <refreshVisibility>1</refreshVisibility>
     <Link>
-      <href>http://10.0.0.212:5000/alerts.kml</href>
+      <href>http://10.0.0.0:5000/alerts.kml</href>
       <refreshMode>onInterval</refreshMode>
       <refreshInterval>60</refreshInterval> </Link>
   </NetworkLink>
