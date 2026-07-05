@@ -412,6 +412,19 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "pomarańczowy alert na silny wiatr": "Storms, Tornados, Floods & Winds",
     "výstraha pred vetrom na horách": "Storms, Tornados, Floods & Winds",
     "żółty alert na silny wiatr": "Storms, Tornados, Floods & Winds",
+    "lluvias tormenta eléctrica": "Storms, Tornados, Floods & Winds",
+    "onda tropical": "Storms, Tornados, Floods & Winds",
+    "gusty winds, thunder shower, and lightning": "Storms, Tornados, Floods & Winds",
+    "pomarańczowy alert na sztorm": "Storms, Tornados, Floods & Winds",
+    "lightning, gusty winds, and thunder shower": "Storms, Tornados, Floods & Winds",
+    "light rain, thundershowers": "Storms, Tornados, Floods & Winds",
+    "wind yellow warning": "Storms, Tornados, Floods & Winds",
+    "mvua kubwa": "Storms, Tornados, Floods & Winds",
+    "precip. moderadas isoterma 0 alta": "Storms, Tornados, Floods & Winds",
+    "tormenta": "Storms, Tornados, Floods & Winds",
+    "typhoon warning": "Storms, Tornados, Floods & Winds",
+    "typhoon watch": "Storms, Tornados, Floods & Winds",
+    "رگبار باران، رعد و برق، وزش باد شدید موقت، در مناطق مستعد تگرگ سیلاب‌های لحظه‌ای": "Storms, Tornados, Floods & Winds",
 
     # === TEMPERATURE EXTREMES ===
     "aviso de temperaturas máximas de nivel amarillo": "Temperature Extremes",
@@ -535,6 +548,7 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "aviso vermelho calor": "Temperature Extremes",
     "bajas temperaturas heladas": "Temperature Extremes",
     "bajas temperaturas helada": "Temperature Extremes",
+    "calor": "Temperature Extremes",
 
     # === WINTER WEATHER ===
     "awareness_type=6, awareness_level=1": "Winter Weather",
@@ -573,6 +587,10 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "winter weather advisory": "Winter Weather",
     "заморозки": "Winter Weather",
     "heladas intensas": "Winter Weather",
+    "snow": "Winter Weather",
+    "snow advisory": "Winter Weather",
+    "snow warning": "Winter Weather",
+    "snow watch": "Winter Weather",
 
     # === FIRE & SMOKE ===
     "awareness_type=9, awareness_level=1": "Fire & Smoke",
@@ -616,6 +634,11 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "divieto di accendere fuochi": "Fire & Smoke",
     "aspen acres wildland fire": "Fire & Smoke",
     "großbrand": "Fire & Smoke",
+    "a2 - fire - go message": "Fire & Smoke",
+    "fire ban in effect until further notice": "Fire & Smoke",
+    "incendie": "Fire & Smoke",
+    "mine fire rollback": "Fire & Smoke",
+    "pocket fire set": "Fire & Smoke",
 
     # === EARTHQUAKE, TSUNAMI & VOLCANO ===
     "avalanche": "Earthquake, Tsunami & Volcano",
@@ -653,6 +676,8 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "geologic hazard": "Earthquake, Tsunami & Volcano",
     "jordskred": "Earthquake, Tsunami & Volcano",
     "landslide": "Earthquake, Tsunami & Volcano",
+    "лавины": "Earthquake, Tsunami & Volcano",
+    "avalanche warning": "Earthquake, Tsunami & Volcano",
 
     # === MARINE & COASTAL ===
     "aallokkovaroitus": "Marine & Coastal",
@@ -708,6 +733,11 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "أمواج مرتفعة": "Marine & Coastal",
     "vientos y oleajes en el caribe panameño": "Marine & Coastal",
     "low sea": "Marine & Coastal",
+    "маловодье": "Marine & Coastal",
+    "maritime spécial": "Marine & Coastal",
+    "żółty alert na silny wiatr w strefie brzegowej": "Marine & Coastal",
+    "large coastal surf": "Marine & Coastal",
+    "wave height warning": "Marine & Coastal",
 
     # === AGRICULTURAL & ENVIRONMENTAL ===
     "air quality": "Agricultural & Environmental",
@@ -736,6 +766,7 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "baixa umidade": "Agricultural & Environmental",
     "trockenheit": "Agricultural & Environmental",
     "drinking water": "Agricultural & Environmental",
+    "air quality": "Agricultural & Environmental",
 
     # === EMERGENCY & CIVIL DEFENSE ===
     "chemical": "Emergency & Civil Defense",
@@ -785,6 +816,9 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "red creek area evacuation": "Emergency & Civil Defense",
     "shelter in place warning": "Emergency & Civil Defense",
     "ausfall stromversorgung": "Emergency & Civil Defense",
+    "ausfall kommunikationsmittel": "Emergency & Civil Defense",
+    "yarnell status go": "Emergency & Civil Defense",
+    "ycu-2411 set message": "Emergency & Civil Defense",
 
     # === AMBER ALERTS ===
     "amber alert": "Amber Alerts",
