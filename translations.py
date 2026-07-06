@@ -425,6 +425,10 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "typhoon warning": "Storms, Tornados, Floods & Winds",
     "typhoon watch": "Storms, Tornados, Floods & Winds",
     "رگبار باران، رعد و برق، وزش باد شدید موقت، در مناطق مستعد تگرگ سیلاب‌های لحظه‌ای": "Storms, Tornados, Floods & Winds",
+    "dust storm warning": "Storms, Tornados, Floods & Winds",
+    "extreme wind warning": "Storms, Tornados, Floods & Winds",
+    "precip. fuertes isoterma 0 alta": "Storms, Tornados, Floods & Winds",
+    "tormenta lluvia": "Storms, Tornados, Floods & Winds",
 
     # === TEMPERATURE EXTREMES ===
     "aviso de temperaturas máximas de nivel amarillo": "Temperature Extremes",
@@ -639,6 +643,7 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "incendie": "Fire & Smoke",
     "mine fire rollback": "Fire & Smoke",
     "pocket fire set": "Fire & Smoke",
+    "yarnell fire all clear": "Fire & Smoke",
 
     # === EARTHQUAKE, TSUNAMI & VOLCANO ===
     "avalanche": "Earthquake, Tsunami & Volcano",
@@ -738,6 +743,7 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "żółty alert na silny wiatr w strefie brzegowej": "Marine & Coastal",
     "large coastal surf": "Marine & Coastal",
     "wave height warning": "Marine & Coastal",
+    "high surf warning": "Marine & Coastal",
 
     # === AGRICULTURAL & ENVIRONMENTAL ===
     "air quality": "Agricultural & Environmental",
@@ -819,6 +825,8 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "ausfall kommunikationsmittel": "Emergency & Civil Defense",
     "yarnell status go": "Emergency & Civil Defense",
     "ycu-2411 set message": "Emergency & Civil Defense",
+    "chamois community is a cooling center": "Emergency & Civil Defense",
+    "mahoning county alerts": "Emergency & Civil Defense",
 
     # === AMBER ALERTS ===
     "amber alert": "Amber Alerts",
