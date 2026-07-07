@@ -429,6 +429,17 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "extreme wind warning": "Storms, Tornados, Floods & Winds",
     "precip. fuertes isoterma 0 alta": "Storms, Tornados, Floods & Winds",
     "tormenta lluvia": "Storms, Tornados, Floods & Winds",
+    "adverse weather": "Storms, Tornados, Floods & Winds",
+    "waterlogging": "Storms, Tornados, Floods & Winds",
+    "καταιγίδα κίτρινο": "Storms, Tornados, Floods & Winds",
+    "precip. intensas isoterma 0 alta": "Storms, Tornados, Floods & Winds",
+    "veðurviðvörun: vindur": "Storms, Tornados, Floods & Winds",
+    "schwere sturmböen": "Storms, Tornados, Floods & Winds",
+    "blowing dust advisory": "Storms, Tornados, Floods & Winds",
+    "tropical cyclone local statement": "Storms, Tornados, Floods & Winds",
+    "عوالق ترابية": "Storms, Tornados, Floods & Winds",
+    "czerwony alert na silny wiatr": "Storms, Tornados, Floods & Winds",
+    "orange wind warning": "Storms, Tornados, Floods & Winds",
 
     # === TEMPERATURE EXTREMES ===
     "aviso de temperaturas máximas de nivel amarillo": "Temperature Extremes",
@@ -644,6 +655,8 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "mine fire rollback": "Fire & Smoke",
     "pocket fire set": "Fire & Smoke",
     "yarnell fire all clear": "Fire & Smoke",
+    "požarna ogroženost - velika ogroženost": "Fire & Smoke",
+    "riziko požárů": "Fire & Smoke",
 
     # === EARTHQUAKE, TSUNAMI & VOLCANO ===
     "avalanche": "Earthquake, Tsunami & Volcano",
@@ -744,6 +757,8 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "large coastal surf": "Marine & Coastal",
     "wave height warning": "Marine & Coastal",
     "high surf warning": "Marine & Coastal",
+    "وزش باد و افزایش ارتفاع امواج دریا": "Marine & Coastal",
+    "hazardous seas watch": "Marine & Coastal",
 
     # === AGRICULTURAL & ENVIRONMENTAL ===
     "air quality": "Agricultural & Environmental",
@@ -827,6 +842,7 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "ycu-2411 set message": "Emergency & Civil Defense",
     "chamois community is a cooling center": "Emergency & Civil Defense",
     "mahoning county alerts": "Emergency & Civil Defense",
+    "اللشمانيا": "Emergency & Civil Defense",
 
     # === AMBER ALERTS ===
     "amber alert": "Amber Alerts",
@@ -849,6 +865,7 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "practice/demo warning": "Test & Exercise",
     "monthly system test": "Test & Exercise",
     "weekly eas test": "Test & Exercise",
+    "system test": "Test & Exercise",
 
     # === Multi-Purpose ===
     "weather": "Multi-Purpose",
@@ -868,6 +885,7 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "other hazard": "Multi-Purpose",
     "other hazards": "Multi-Purpose",
     "alarmering": "Multi-Purpose",
+    "alert": "Multi-Purpose",
 
     # === MISC ===
     "anderes ereignis": "Misc",
