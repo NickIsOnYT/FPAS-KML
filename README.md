@@ -11,7 +11,8 @@ A Python application that harvests Common Alerting Protocol (CAP) data from `ale
 
 ## Setup and Installation
 
-- Download [Google Earth Pro](https://www.google.com/earth/about/versions/)
+- <s>Download [Google Earth Pro](https://www.google.com/earth/about/versions/)</s> (Google Earth Pro is shutting down)
+- Download [ArcGIS Earth](https://www.esri.com/en-us/arcgis/products/arcgis-earth/downloads) (good alternative)
 - Download [Python 3.14.3](https://www.python.org/downloads/release/python-3143/)
 - Make sure to add it to your paths.
 
