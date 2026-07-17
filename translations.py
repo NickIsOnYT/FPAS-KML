@@ -440,6 +440,33 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "عوالق ترابية": "Storms, Tornados, Floods & Winds",
     "czerwony alert na silny wiatr": "Storms, Tornados, Floods & Winds",
     "orange wind warning": "Storms, Tornados, Floods & Winds",
+    "rain level 1": "Storms, Tornados, Floods & Winds",
+    "rain level 2": "Storms, Tornados, Floods & Winds",
+    "rain level 3": "Storms, Tornados, Floods & Winds",
+    "lightning, heavy rain, gusty winds, and thunderstorm": "Storms, Tornados, Floods & Winds",
+    "czerwony alert na silny sztorm": "Storms, Tornados, Floods & Winds",
+    "أمطار غزيرة": "Storms, Tornados, Floods & Winds",
+    "inundación tormentas eléctricas": "Storms, Tornados, Floods & Winds",
+    "czerwony alert na burze w strefie brzegowej": "Storms, Tornados, Floods & Winds",
+    "orange rain warning": "Storms, Tornados, Floods & Winds",
+    "颱風": "Storms, Tornados, Floods & Winds",
+    "أتربة مثارة / عواصف ترابية": "Storms, Tornados, Floods & Winds",
+    "lluvias y vientos": "Storms, Tornados, Floods & Winds",
+    "lluvias y vientos fuertes": "Storms, Tornados, Floods & Winds",
+    "moderate fog warning": "Storms, Tornados, Floods & Winds",
+    "lightning, heavy rain, and gusty winds": "Storms, Tornados, Floods & Winds",
+    "pousyè/sab": "Storms, Tornados, Floods & Winds",
+    "precipitaciones intensas": "Storms, Tornados, Floods & Winds",
+    "schweres gewitter mit orkanböen, extrem heftigem starkregen und hagel": "Storms, Tornados, Floods & Winds",
+    "schweres gewitter mit orkanböen, heftigem starkregen und hagel": "Storms, Tornados, Floods & Winds",
+    "tormentas fuertes con lluvias intensas, rafagas y ocasional caida de granizo - aviso naranja": "Storms, Tornados, Floods & Winds",
+    "vendaval": "Storms, Tornados, Floods & Winds",
+    "vientos alisios y lluvias": "Storms, Tornados, Floods & Winds",
+    "vientos, fuertes a moderados del norte": "Storms, Tornados, Floods & Winds",
+    "vientos, fuertes a moderados del sur": "Storms, Tornados, Floods & Winds",
+    "yellow tordenvarsel": "Storms, Tornados, Floods & Winds",
+    "yellow wind warning": "Storms, Tornados, Floods & Winds",
+    "yellow torden": "Storms, Tornados, Floods & Winds",
 
     # === TEMPERATURE EXTREMES ===
     "aviso de temperaturas máximas de nivel amarillo": "Temperature Extremes",
@@ -564,6 +591,13 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "bajas temperaturas heladas": "Temperature Extremes",
     "bajas temperaturas helada": "Temperature Extremes",
     "calor": "Temperature Extremes",
+    "nighttimeheat advisory": "Temperature Extremes",
+    "heat advisory": "Temperature Extremes",
+    "heat warning": "Temperature Extremes",
+    "heat advisory change": "Temperature Extremes",
+    "heat warning change": "Temperature Extremes",
+    "silná zátěž teplem": "Temperature Extremes",
+    "μέγιστη θερμοκρασία κίτρινο": "Temperature Extremes",
 
     # === WINTER WEATHER ===
     "awareness_type=6, awareness_level=1": "Winter Weather",
@@ -657,6 +691,12 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "yarnell fire all clear": "Fire & Smoke",
     "požarna ogroženost - velika ogroženost": "Fire & Smoke",
     "riziko požárů": "Fire & Smoke",
+    "fire ban": "Fire & Smoke",
+    "forest (grassland) fire risk": "Fire & Smoke",
+    "rolling fire rollback to set": "Fire & Smoke",
+    "fire ban in effect": "Fire & Smoke",
+    "dense smoke advisory": "Fire & Smoke",
+    "dense smoke warning": "Fire & Smoke",
 
     # === EARTHQUAKE, TSUNAMI & VOLCANO ===
     "avalanche": "Earthquake, Tsunami & Volcano",
@@ -759,6 +799,7 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "high surf warning": "Marine & Coastal",
     "وزش باد و افزایش ارتفاع امواج دریا": "Marine & Coastal",
     "hazardous seas watch": "Marine & Coastal",
+    "sea wave": "Marine & Coastal",
 
     # === AGRICULTURAL & ENVIRONMENTAL ===
     "air quality": "Agricultural & Environmental",
@@ -788,6 +829,9 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "trockenheit": "Agricultural & Environmental",
     "drinking water": "Agricultural & Environmental",
     "air quality": "Agricultural & Environmental",
+    "dusty plankton": "Agricultural & Environmental",
+    "raised dust/ dust storms": "Agricultural & Environmental",
+    "raised dust/dust storms": "Agricultural & Environmental",
 
     # === EMERGENCY & CIVIL DEFENSE ===
     "chemical": "Emergency & Civil Defense",
@@ -843,6 +887,11 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "chamois community is a cooling center": "Emergency & Civil Defense",
     "mahoning county alerts": "Emergency & Civil Defense",
     "اللشمانيا": "Emergency & Civil Defense",
+    "水門資訊": "Emergency & Civil Defense",
+    "water contamination": "Emergency & Civil Defense",
+    "ycu-2336 go status": "Emergency & Civil Defense",
+    "cordes lakes go message": "Emergency & Civil Defense",
+    "slaughterhouse set status": "Emergency & Civil Defense",
 
     # === AMBER ALERTS ===
     "amber alert": "Amber Alerts",
@@ -886,6 +935,8 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "other hazards": "Multi-Purpose",
     "alarmering": "Multi-Purpose",
     "alert": "Multi-Purpose",
+    "國家森林遊樂區": "Multi-Purpose",
+    "agrometeorological disaster": "Multi-Purpose",
 
     # === MISC ===
     "anderes ereignis": "Misc",
