@@ -476,6 +476,11 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "tormentas fuertes con lluvias intensas y ocasional caida de granizo - aviso naranja": "Storms, Tornados, Floods & Winds",
     "tormentas puntualmente fuertes": "Storms, Tornados, Floods & Winds",
     "淹水感測": "Storms, Tornados, Floods & Winds",
+    "nebel": "Storms, Tornados, Floods & Winds",
+    "tormentas fuertes y puntualmente severas": "Storms, Tornados, Floods & Winds",
+    "windwarnung": "Storms, Tornados, Floods & Winds",
+    "yellow regn": "Storms, Tornados, Floods & Winds",
+    "ضباب خفيف": "Storms, Tornados, Floods & Winds",
 
     # === TEMPERATURE EXTREMES ===
     "aviso de temperaturas máximas de nivel amarillo": "Temperature Extremes",
@@ -607,6 +612,11 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "heat warning change": "Temperature Extremes",
     "silná zátěž teplem": "Temperature Extremes",
     "μέγιστη θερμοκρασία κίτρινο": "Temperature Extremes",
+    "hot weather": "Temperature Extremes",
+    "hot day": "Temperature Extremes",
+    "hot day conditions": "Temperature Extremes",
+    "severe high-temperature warning": "Temperature Extremes",
+    "severe high temperature warning": "Temperature Extremes",
 
     # === WINTER WEATHER ===
     "awareness_type=6, awareness_level=1": "Winter Weather",
@@ -809,6 +819,8 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "وزش باد و افزایش ارتفاع امواج دریا": "Marine & Coastal",
     "hazardous seas watch": "Marine & Coastal",
     "sea wave": "Marine & Coastal",
+    "increasing wind speed and wave height": "Marine & Coastal",
+    "aviso de rissagas de nivel amarillo": "Marine & Coastal",
 
     # === AGRICULTURAL & ENVIRONMENTAL ===
     "air quality": "Agricultural & Environmental",
