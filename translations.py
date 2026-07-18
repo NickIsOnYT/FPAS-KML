@@ -467,6 +467,15 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "yellow tordenvarsel": "Storms, Tornados, Floods & Winds",
     "yellow wind warning": "Storms, Tornados, Floods & Winds",
     "yellow torden": "Storms, Tornados, Floods & Winds",
+    "*ccem - museum - threshold #2 - flooding": "Storms, Tornados, Floods & Winds",
+    "stormsurge advisory clear": "Storms, Tornados, Floods & Winds",
+    "heavyrain advisory clear": "Storms, Tornados, Floods & Winds",
+    "heavyrain warning clear": "Storms, Tornados, Floods & Winds",
+    "wind yellow": "Storms, Tornados, Floods & Winds",
+    "tormentas eléctricas": "Storms, Tornados, Floods & Winds",
+    "tormentas fuertes con lluvias intensas y ocasional caida de granizo - aviso naranja": "Storms, Tornados, Floods & Winds",
+    "tormentas puntualmente fuertes": "Storms, Tornados, Floods & Winds",
+    "淹水感測": "Storms, Tornados, Floods & Winds",
 
     # === TEMPERATURE EXTREMES ===
     "aviso de temperaturas máximas de nivel amarillo": "Temperature Extremes",
@@ -892,6 +901,8 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "ycu-2336 go status": "Emergency & Civil Defense",
     "cordes lakes go message": "Emergency & Civil Defense",
     "slaughterhouse set status": "Emergency & Civil Defense",
+    "ccem": "Emergency & Civil Defense",
+    "law enforcement warning": "Emergency & Civil Defense",
 
     # === AMBER ALERTS ===
     "amber alert": "Amber Alerts",
@@ -937,6 +948,7 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "alert": "Multi-Purpose",
     "國家森林遊樂區": "Multi-Purpose",
     "agrometeorological disaster": "Multi-Purpose",
+    "festival/fair/temple stampedes": "Multi-Purpose",
 
     # === MISC ===
     "anderes ereignis": "Misc",
@@ -946,4 +958,6 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "прочие опасности": "Misc",
     "remove": "Misc",
     "brand": "Misc",
+    "dangerous animals": "Misc",
+    "dangerous animal": "Misc",
 })
