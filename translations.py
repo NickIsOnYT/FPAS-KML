@@ -481,6 +481,8 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "windwarnung": "Storms, Tornados, Floods & Winds",
     "yellow regn": "Storms, Tornados, Floods & Winds",
     "ضباب خفيف": "Storms, Tornados, Floods & Winds",
+    "tormentas fuertes con lluvias intensas, rafagas y caida de granizo - aviso naranja": "Storms, Tornados, Floods & Winds",
+    "pipeline/schultz area flooding": "Storms, Tornados, Floods & Winds",
 
     # === TEMPERATURE EXTREMES ===
     "aviso de temperaturas máximas de nivel amarillo": "Temperature Extremes",
@@ -659,6 +661,7 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "snow advisory": "Winter Weather",
     "snow warning": "Winter Weather",
     "snow watch": "Winter Weather",
+    "nevadas fuertes": "Winter Weather",
 
     # === FIRE & SMOKE ===
     "awareness_type=9, awareness_level=1": "Fire & Smoke",
@@ -915,6 +918,8 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "slaughterhouse set status": "Emergency & Civil Defense",
     "ccem": "Emergency & Civil Defense",
     "law enforcement warning": "Emergency & Civil Defense",
+    "ohio gulch go evacuation status": "Emergency & Civil Defense",
+    "indian creek set to go.": "Emergency & Civil Defense",
 
     # === AMBER ALERTS ===
     "amber alert": "Amber Alerts",
@@ -961,6 +966,7 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "國家森林遊樂區": "Multi-Purpose",
     "agrometeorological disaster": "Multi-Purpose",
     "festival/fair/temple stampedes": "Multi-Purpose",
+    "administrative message/follow up statement": "Multi-Purpose",
 
     # === MISC ===
     "anderes ereignis": "Misc",
