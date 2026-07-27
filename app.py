@@ -79,8 +79,8 @@ def get_kml_color_palette(severity):
         pin_color  = 'ff00d7ff'  # High-contrast Electric Gold (#FFD700)
         
     elif 'minor' in sev_clean:
-        poly_color = 'ffefae00'  # High-contrast Electric Light Blue (#00AEEF)
-        pin_color  = 'b0e6d800'  # Semi-transparent Deep Cyan / Teal (#00D8E6)
+        poly_color = 'b0efae00'  # High-contrast Electric Light Blue (#00AEEF)
+        pin_color  = 'ffe6d800'  # Semi-transparent Deep Cyan / Teal (#00D8E6)
         
     else:  # Handles "UNKNOWN", "Notice", "Informational", etc.
         poly_color = 'b0aaaaaa'  # Semi-transparent Gray (#AAAAAA)
