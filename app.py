@@ -604,21 +604,21 @@ def serve_kml():
                     geo_fingerprint = f"{geom['coords'][0][0]},{geom['coords'][0][1]}_{geom['coords'][-1][0]}_{geom['coords'][-1][1]}_{len(geom['coords'])}"
                     
                     if geo_fingerprint not in rendered_polygon_fingerprints:
+                        # Reusing the unified pin popup structure (including description, instructions handling via body, and sources block)
                         shape_popup = f"""
-                        <h3>{geom['event_title'].title()} - {geom['location_name']}</h3>
-                        <p><b>Severity:</b> {p['severity']} &nbsp;|&nbsp; <b>Active:</b> {p['effective']} to {p['expires']}</p>
+                        <h3>{p['title']}</h3>
+                        <p><b>Region:</b> {geom['location_name']}</p>
+                        <p>
+                            <b>Severity:</b> {p['severity']} &nbsp;|&nbsp; 
+                            <b>Active:</b> {p['effective']} to {p['expires']}
+                        </p>
                         <hr/>
-                        <p>{geom['description']}</p>
-                        """
-                        if geom['instruction']:
-                            shape_popup += f"<h4>Instructions:</h4><p>{geom['instruction']}</p>"
-                        
-                        shape_popup += f"""
+                        {p['body']}
                         <hr/>
                         <h4 style="margin-bottom:5px;">Sources:</h4>
-                        <p style="font-size: 11px; margin-top:0px; color: #555555;">
-                            <b>{geom['event_title'].title()}:</b> <a href="{p['url']}">View CAP JSON Data</a>
-                        </p>
+                        <div style="margin-top:0px; padding-left:8px; font-size:11px; color:#555555;">
+                            {build_sources_html(p['title'], p['url'], p['body'], p.get('links', []))}
+                        </div>
                         """
                         
                         pol = target_folder.newpolygon(name=geom['event_title'].title(), outerboundaryis=geom["coords"])
@@ -644,21 +644,21 @@ def serve_kml():
                             p_lat = lat_c + (deg_radius * math.sin(angle))
                             circle_coords.append((p_lon, p_lat))
                             
+                        # Reusing the unified pin popup structure for circular geometry polygons as well
                         shape_popup = f"""
-                        <h3>{geom['event_title'].title()} - {geom['location_name']}</h3>
-                        <p><b>Severity:</b> {p['severity']} &nbsp;|&nbsp; <b>Active:</b> {p['effective']} to {p['expires']}</p>
+                        <h3>{p['title']}</h3>
+                        <p><b>Region:</b> {geom['location_name']}</p>
+                        <p>
+                            <b>Severity:</b> {p['severity']} &nbsp;|&nbsp; 
+                            <b>Active:</b> {p['effective']} to {p['expires']}
+                        </p>
                         <hr/>
-                        <p>{geom['description']}</p>
-                        """
-                        if geom['instruction']:
-                            shape_popup += f"<h4>Instructions:</h4><p>{geom['instruction']}</p>"
-                        
-                        shape_popup += f"""
+                        {p['body']}
                         <hr/>
                         <h4 style="margin-bottom:5px;">Sources:</h4>
-                        <p style="font-size: 11px; margin-top:0px; color: #555555;">
-                            <b>{geom['event_title'].title()}:</b> <a href="{p['url']}">View CAP JSON Data</a>
-                        </p>
+                        <div style="margin-top:0px; padding-left:8px; font-size:11px; color:#555555;">
+                            {build_sources_html(p['title'], p['url'], p['body'], p.get('links', []))}
+                        </div>
                         """
                         
                         pol = target_folder.newpolygon(name=geom['event_title'].title(), outerboundaryis=circle_coords)
