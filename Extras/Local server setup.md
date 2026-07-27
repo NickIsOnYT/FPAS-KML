@@ -2,12 +2,12 @@
 - The local network IP should be in the console when you boot up the script. (It usually looks like `192.168.1.X` or `10.0.0.X`).
 - open the included `live_alerts_server.kml` file in a text editor.
 - Chnage the line labeled `<href>http://10.0.0.212:5000/alerts.kml</href>` to the local network ip. (ex: `http://ip_here:5000/alerts.kml`)
-- You can now open the KML file in ArcGIS Earth, and it should be fully configured to the default.
+- You can now open the KML file in Google Earth, and it should be fully configured to the default.
 
 
 ## Set up a local server (manual)
 - The local network IP should be in the console when you boot up the script. (It usually looks like `192.168.1.X` or `10.0.0.X`)
-- On the secondary computer where you want to view the map, open ArcGIS Earth, click the plus button, click `Add from Path`, select the `KML/KMZ` type, and input the Host PC's IP address in the "Add from Path" text field.
+- On the secondary computer where you want to view the map, open Google Earth Pro, add a Network Link, and input the Host PC's IP address.
 `http://YOUR_HOST_IP_HERE:5000/alerts.kml (eg: http://192.168.1.45:5000/alerts.kml)`
 
 
