@@ -142,7 +142,7 @@ def build_sources_html(title, cap_url, body_text, extra_links=None):
                 f'<div><a href="{html.escape(full_url, quote=True)}" target="_blank">{html.escape(display_text)}</a></div>'
             )
 
-    return "".join(items)
+    return f'<div style="padding-bottom: 40px;">{"".join(items)}</div>'
 
 def fetch_single_alert(alert_id):
     try:
