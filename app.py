@@ -64,25 +64,25 @@ def get_kml_color_palette(severity):
     Returns (polygon_color_kml, pin_color_kml) in KML aabbggrr format.
     Pins match the hue family of their polygons but use maximum brightness/contrast.
     """
-    severity = severity.lower()
+    sev_clean = str(severity).strip().lower()
     
-    if 'extreme' in severity:
+    if 'extreme' in sev_clean:
         poly_color = 'b0800080'  # Semi-transparent Purple (#800080)
         pin_color  = 'ffff00ff'  # High-contrast Magenta / Neon Pink (#FF00FF)
         
-    elif 'severe' in severity:
+    elif 'severe' in sev_clean:
         poly_color = 'b00000ff'  # Semi-transparent Red (#FF0000)
         pin_color  = 'ff8080ff'  # High-contrast Light Coral Red (#FF8080)
         
-    elif 'moderate' in severity:
+    elif 'moderate' in sev_clean:
         poly_color = 'b000a5ff'  # Semi-transparent Orange (#FFA500)
         pin_color  = 'ff00d7ff'  # High-contrast Electric Gold (#FFD700)
         
-    elif 'minor' in severity:
-        poly_color = 'b0e6d800'  # Semi-transparent Deep Cyan / Teal (#00D8E6)
-        pin_color  = 'ffffff00'  # High-contrast Electric Light Blue / Cyan (#00FFFF)
+    elif 'minor' in sev_clean:
+        poly_color = 'ffefae00'  # High-contrast Electric Light Blue (#00AEEF)
+        pin_color  = 'b0e6d800'  # Semi-transparent Deep Cyan / Teal (#00D8E6)
         
-    else:  # Unknown / Notice
+    else:  # Handles "UNKNOWN", "Notice", "Informational", etc.
         poly_color = 'b0aaaaaa'  # Semi-transparent Gray (#AAAAAA)
         pin_color  = 'ffffffff'  # Pure White (#FFFFFF)
         
@@ -522,12 +522,18 @@ def serve_kml():
         
         # StyleMap creates an expanded hit box and high-contrast styling for ArcGIS Earth
         style_map = simplekml.StyleMap()
+        
+        # Normal State
         style_map.normalstyle.iconstyle.color = lead_pin['pin_color']
         style_map.normalstyle.iconstyle.scale = 1.2
+        # Explicitly use white pushpin base image so KML tinting renders true colors without yellow tint
+        style_map.normalstyle.iconstyle.icon.href = 'http://maps.google.com/mapfiles/kml/pushpin/wht-pushpin.png'
         style_map.normalstyle.labelstyle.scale = 0.9
         
+        # Highlight State
         style_map.highlightstyle.iconstyle.color = lead_pin['pin_color']
-        style_map.highlightstyle.iconstyle.scale = 1.7  # Expands click target when hovered over
+        style_map.highlightstyle.iconstyle.scale = 1.7  # Expands click target on hover
+        style_map.highlightstyle.iconstyle.icon.href = 'http://maps.google.com/mapfiles/kml/pushpin/wht-pushpin.png'
         style_map.highlightstyle.labelstyle.scale = 1.0
         
         pin.stylemap = style_map
