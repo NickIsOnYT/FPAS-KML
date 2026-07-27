@@ -491,7 +491,7 @@ def serve_kml():
             {lead_pin['body']}
             <hr/>
             <h4 style="margin-bottom:5px;">Sources:</h4>
-            <div style="margin-top:0px; padding-left:8px; font-size:11px; color:#555555;">
+            <div style="margin-top:0px; padding-left:8px; padding-bottom:40px; font-size:11px; color:#555555;">
                 {build_sources_html(lead_pin['title'], lead_pin['url'], lead_pin['body'], lead_pin.get('links', []))}
             </div>
             """
