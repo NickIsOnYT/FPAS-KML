@@ -1,4 +1,3 @@
-# app.py
 from flask import Flask, Response
 import requests
 import simplekml
@@ -15,7 +14,6 @@ import json       # Local disk alert persistence
 import re         # Detect links in alert text
 import html       # Escape popup link content safely
 
-# Import the module as an object so we can pass it to importlib.reload
 import translations
 
 app = Flask(__name__)
@@ -34,7 +32,6 @@ def load_local_disk_cache():
     global ALERT_CACHE
     print(f"[Initialization] Scanning local disk cache: {CACHE_DIR}", flush=True)
     try:
-        # Pre-filter files to discover the exact load queue size
         json_files = [f for f in os.listdir(CACHE_DIR) if f.endswith(".json")]
         total_files = len(json_files)
         print(f"[Initialization] Found {total_files} cached alerts on disk to load.", flush=True)
@@ -62,7 +59,7 @@ def load_local_disk_cache():
     except Exception as dir_err:
         print(f"[Initialization] Error accessing cache directory: {dir_err}", flush=True)
 
-def get_kml_color(severity, alpha=150):
+def get_kml_color(severity, alpha=180): # Slightly higher opacity for ArcGIS Earth
     alpha_hex = f'{alpha:02x}'
     severity = severity.lower()
     if 'minor' in severity: base_color = '00ffff'
@@ -80,7 +77,6 @@ def kml_color_to_hex(kml_color_str):
     return "333333"
 
 def calculate_centroid_from_geometries(geometries):
-    """Converts coordinate pairs to tuples to maintain hashability when reading from JSON disk cache."""
     all_coords = []
     for geom in geometries:
         all_coords.extend(geom["coords"])
@@ -93,7 +89,6 @@ def calculate_centroid_from_geometries(geometries):
     return (avg_lon, avg_lat)
 
 def format_cap_timestamp(ts_str):
-    """Formats standard ISO-8601 CAP timestamps into a cleaner, human-readable view."""
     if not ts_str:
         return "N/A"
     try:
@@ -104,9 +99,7 @@ def format_cap_timestamp(ts_str):
         pass
     return ts_str
 
-
 def extract_links_from_text(text):
-    """Extracts basic http/https and www links from CAP text fields."""
     if not text:
         return []
 
@@ -124,16 +117,13 @@ def extract_links_from_text(text):
 
     return links
 
-
 def build_sources_html(title, cap_url, body_text, extra_links=None):
-    """Builds a simple Sources HTML block with the CAP JSON link plus discovered URLs."""
     items = [
-        f'<div><b>{html.escape(title)}:</b> <a href="{html.escape(cap_url, quote=True)}">View CAP JSON</a></div>'
+        f'<div><b>{html.escape(title)}:</b> <a href="{html.escape(cap_url, quote=True)}" target="_blank">View CAP JSON</a></div>'
     ]
 
     seen_urls = set()
     for source in extra_links or []:
-        # Account for JSON lists breaking tuple structures during disk load conversions
         if isinstance(source, (tuple, list)) and len(source) >= 2:
             display_text, full_url = source[0], source[1]
         else:
@@ -142,18 +132,17 @@ def build_sources_html(title, cap_url, body_text, extra_links=None):
         if full_url and isinstance(full_url, str) and full_url not in seen_urls:
             seen_urls.add(full_url)
             items.append(
-                f'<div><a href="{html.escape(full_url, quote=True)}">{html.escape(str(display_text))}</a></div>'
+                f'<div><a href="{html.escape(full_url, quote=True)}" target="_blank">{html.escape(str(display_text))}</a></div>'
             )
 
     for display_text, full_url in extract_links_from_text(body_text):
         if full_url not in seen_urls:
             seen_urls.add(full_url)
             items.append(
-                f'<div><a href="{html.escape(full_url, quote=True)}">{html.escape(display_text)}</a></div>'
+                f'<div><a href="{html.escape(full_url, quote=True)}" target="_blank">{html.escape(display_text)}</a></div>'
             )
 
     return "".join(items)
-
 
 def fetch_single_alert(alert_id):
     try:
@@ -161,7 +150,6 @@ def fetch_single_alert(alert_id):
         if r.status_code != 200: return alert_id, None
         
         root = ET.fromstring(r.content)
-        
         info_main = root.find('.//{*}info')
         if info_main is None: return alert_id, None
 
@@ -177,7 +165,6 @@ def fetch_single_alert(alert_id):
         for info_block in root.findall('.//{*}info'):
             lang = info_block.findtext('{*}language', 'en-CA')
             local_event = info_block.findtext('{*}event', event)
-            
             base_description = info_block.findtext('{*}description', 'No description.').strip()
             local_instruction = info_block.findtext('{*}instruction', '').strip()
 
@@ -194,15 +181,12 @@ def fetch_single_alert(alert_id):
                     if full_url not in {u for _, u in info_links}:
                         info_links.append((display_text, full_url))
             
-            cmam_long = None
-            cmam_short = None
+            cmam_long, cmam_short = None, None
             for param in info_block.findall('{*}parameter'):
                 v_name = param.findtext('{*}valueName', '').strip()
                 v_val = param.findtext('{*}value', '').strip()
-                if v_name == 'CMAMlongtext':
-                    cmam_long = v_val
-                elif v_name == 'CMAMtext':
-                    cmam_short = v_val
+                if v_name == 'CMAMlongtext': cmam_long = v_val
+                elif v_name == 'CMAMtext': cmam_short = v_val
             
             local_description = cmam_long or cmam_short or base_description
             
@@ -265,7 +249,6 @@ def fetch_single_alert(alert_id):
 def background_alert_harvester():
     global ALERT_CACHE
     print("[Background Thread] Started alert harvester worker.", flush=True)
-    
     while True:
         try:
             print("\n[Background Thread] Syncing with global server...", flush=True)
@@ -281,13 +264,10 @@ def background_alert_harvester():
                     for cid in cached_ids:
                         if cid not in active_ids:
                             del ALERT_CACHE[cid]
-                            # Delete the physical .json file when an alert drops from active list
                             disk_path = os.path.join(CACHE_DIR, f"{cid}.json")
                             if os.path.exists(disk_path):
-                                try:
-                                    os.remove(disk_path)
-                                except Exception:
-                                    pass
+                                try: os.remove(disk_path)
+                                except Exception: pass
                 
                 new_ids = [aid for aid in active_ids if aid not in ALERT_CACHE]
                 total_new = len(new_ids)
@@ -301,13 +281,11 @@ def background_alert_harvester():
                             aid, data = future.result()
                             processed_count += 1
                             if data:
-                                # Save newly downloaded alert to its individual local disk file
                                 disk_path = os.path.join(CACHE_DIR, f"{aid}.json")
                                 try:
                                     with open(disk_path, "w", encoding="utf-8") as f:
                                         json.dump(data, f, ensure_ascii=False)
-                                except Exception:
-                                    pass
+                                except Exception: pass
                                 
                                 with cache_lock:
                                     ALERT_CACHE[aid] = data
@@ -322,7 +300,6 @@ def background_alert_harvester():
                 gc.collect()
             else:
                 print(f"[Background Thread] API error ({r.status_code}), retrying later.", flush=True)
-                
         except Exception as e:
             print(f"[Background Thread] Error during harvesting: {e}", flush=True)
             
@@ -337,7 +314,7 @@ def serve_kml():
     except Exception as reload_error:
         print(f"Warning: Failed to hot-reload translations.py: {reload_error}", flush=True)
         
-    kml = simplekml.Kml()
+    kml = simplekml.Kml(name="FOSSWARN Active Alerts")
     
     with cache_lock:
         cached_alerts = sorted(list(ALERT_CACHE.values()), key=lambda x: x.get("raw_effective", ""), reverse=True)
@@ -355,11 +332,8 @@ def serve_kml():
         expires_str = item.get("expires", "N/A")
 
         data_groups = {}
-
         for geom in item.get("geometries", []):
             event_title = geom.get("event_title", raw_event).title()
-            desc_text = geom.get("description", "No description available.").strip()
-            inst_text = geom.get("instruction", "").strip()
             loc_name = geom.get("location_name", "Unknown Location")
             
             group_key = (event_title, loc_name)
@@ -401,58 +375,10 @@ def serve_kml():
                 
                 if info["instructions"]:
                     body += "<h4>Instructions:</h4>"
-                    
-                    inst_list = list(info["instructions"].keys())
-                    common_suffix = ""
-                    
-                    if len(inst_list) > 1:
-                        # Determine the maximum common trailing string length
-                        reversed_strings = [s[::-1] for s in inst_list]
-                        min_len = min(len(s) for s in reversed_strings)
-                        suffix_len = 0
-                        for i in range(min_len):
-                            if len(set(s[i] for s in reversed_strings)) == 1:
-                                suffix_len += 1
-                            else:
-                                break
-                        
-                        if suffix_len > 0:
-                            raw_suffix = inst_list[0][-suffix_len:]
-                            
-                            # Verify if the match naturally aligns with a whole-word boundary
-                            clean_start = True
-                            for s in inst_list:
-                                boundary_idx = len(s) - suffix_len
-                                if boundary_idx > 0 and s[boundary_idx - 1] not in [" ", "\n", "\r", "\t", ".", "!", "?", ",", ";"]:
-                                    clean_start = False
-                                    break
-                            
-                            if clean_start:
-                                common_suffix = raw_suffix
-                            else:
-                                # Safe clip fallback: step forward to the next whitespace boundary to drop partial fragments
-                                first_break = min([raw_suffix.find(c) for c in [" ", "\n"] if raw_suffix.find(c) != -1], default=-1)
-                                if first_break != -1:
-                                    common_suffix = raw_suffix[first_break:]
-                                else:
-                                    common_suffix = raw_suffix
-                    
-                    # Render language-specific items minus the global boilerplate footer text
                     for inst_text, inst_langs in sorted(info["instructions"].items()):
                         inst_lang_label = "/".join(sorted(list(inst_langs)))
-                        
-                        display_text = inst_text
-                        if common_suffix and display_text.endswith(common_suffix):
-                            display_text = display_text[:-len(common_suffix)].strip()
-                            
-                        if display_text:
-                            display_text = display_text.replace("\n", "<br/>")
-                            body += f"<p><b>({inst_lang_label}):</b> {display_text}</p>"
-                    
-                    # Place the clean, unified common block once at the absolute bottom
-                    if common_suffix and common_suffix.strip():
-                        clean_suffix = common_suffix.strip().replace("\n", "<br/>")
-                        body += f"<hr style='border:0; border-top:1px dotted #ccc;'/><p>{clean_suffix}</p>"
+                        clean_text = inst_text.replace("\n", "<br/>")
+                        body += f"<p><b>({inst_lang_label}):</b> {clean_text}</p>"
                 
                 pins_to_create.append({
                     "title": info['title'],  
@@ -538,12 +464,9 @@ def serve_kml():
                 <hr style="border: 0; border-top: 1px dashed #ccc;"/>
                 """
                 balloon_body_pieces.append(section)
-                
                 source_links_by_index.append(
                     build_sources_html(f"#{idx} ({p['title']})", p["url"], p["body"], p.get("links", []))
                 )
-            
-            sources_html = "".join(source_links_by_index)
             
             popup_content = f"""
             <h3>{consolidated_title}</h3>
@@ -552,7 +475,7 @@ def serve_kml():
             {"".join(balloon_body_pieces)}
             <h4 style="margin-top:10px; margin-bottom:5px;">Sources:</h4>
             <div style="margin-top:0px; padding-left:8px; font-size:11px; color:#555555;">
-                {sources_html}
+                {"".join(source_links_by_index)}
             </div>
             """
         else:
@@ -573,30 +496,14 @@ def serve_kml():
             </div>
             """
 
-        reg = simplekml.Region()
-        reg.latlonaltbox.north = lead_pin['raw_lat'] + 0.01
-        reg.latlonaltbox.south = lead_pin['raw_lat'] - 0.01
-        reg.latlonaltbox.east = lead_pin['raw_lon'] + 0.01
-        reg.latlonaltbox.west = lead_pin['raw_lon'] - 0.01
-        reg.lod.minlod = 24  
-        reg.lod.maxlod = -1
-
+        # ArcGIS Earth Optimized Pin Styles
         pin = target_folder.newpoint(name=consolidated_title, coords=[(lead_pin['raw_lon'], lead_pin['raw_lat'])])
         pin.description = popup_content
-        pin.region = reg
         
-        style_map = simplekml.StyleMap()
-        style_map.normalstyle.iconstyle.color = lead_pin['color']
-        style_map.normalstyle.iconstyle.scale = 0.9
-        style_map.normalstyle.labelstyle.scale = 0.8  
-        
-        style_map.highlightstyle.iconstyle.color = lead_pin['color']
-        style_map.highlightstyle.iconstyle.scale = 1.1
-        style_map.highlightstyle.labelstyle.scale = 1.0 
-        
-        pin.stylemap = style_map
-        pin.style.balloonstyle.text = "$[description]"
-        pin.style.balloonstyle.bgcolor = "ffffffff"
+        # Standard Style (ArcGIS Earth processes simple icon styles much faster)
+        pin.style.iconstyle.color = lead_pin['color']
+        pin.style.iconstyle.scale = 1.0
+        pin.style.labelstyle.scale = 0.9
 
         for p in stacked_pins:
             for geom in p["geoms"]:
@@ -604,14 +511,10 @@ def serve_kml():
                     geo_fingerprint = f"{geom['coords'][0][0]},{geom['coords'][0][1]}_{geom['coords'][-1][0]}_{geom['coords'][-1][1]}_{len(geom['coords'])}"
                     
                     if geo_fingerprint not in rendered_polygon_fingerprints:
-                        # Reusing the unified pin popup structure (including description, instructions handling via body, and sources block)
                         shape_popup = f"""
                         <h3>{p['title']}</h3>
                         <p><b>Region:</b> {geom['location_name']}</p>
-                        <p>
-                            <b>Severity:</b> {p['severity']} &nbsp;|&nbsp; 
-                            <b>Active:</b> {p['effective']} to {p['expires']}
-                        </p>
+                        <p><b>Severity:</b> {p['severity']} &nbsp;|&nbsp; <b>Active:</b> {p['effective']} to {p['expires']}</p>
                         <hr/>
                         {p['body']}
                         <hr/>
@@ -625,8 +528,7 @@ def serve_kml():
                         pol.description = shape_popup
                         pol.style.polystyle.color = p['color']
                         pol.style.linestyle.color = p['color']
-                        pol.style.balloonstyle.text = "$[description]"
-                        pol.style.balloonstyle.bgcolor = "ffffffff"
+                        pol.style.linestyle.width = 2.0  # Crisp polygon outlines in ArcGIS Earth
                         
                         rendered_polygon_fingerprints.add(geo_fingerprint)
                         
@@ -644,14 +546,10 @@ def serve_kml():
                             p_lat = lat_c + (deg_radius * math.sin(angle))
                             circle_coords.append((p_lon, p_lat))
                             
-                        # Reusing the unified pin popup structure for circular geometry polygons as well
                         shape_popup = f"""
                         <h3>{p['title']}</h3>
                         <p><b>Region:</b> {geom['location_name']}</p>
-                        <p>
-                            <b>Severity:</b> {p['severity']} &nbsp;|&nbsp; 
-                            <b>Active:</b> {p['effective']} to {p['expires']}
-                        </p>
+                        <p><b>Severity:</b> {p['severity']} &nbsp;|&nbsp; <b>Active:</b> {p['effective']} to {p['expires']}</p>
                         <hr/>
                         {p['body']}
                         <hr/>
@@ -665,8 +563,7 @@ def serve_kml():
                         pol.description = shape_popup
                         pol.style.polystyle.color = p['color']
                         pol.style.linestyle.color = p['color']
-                        pol.style.balloonstyle.text = "$[description]"
-                        pol.style.balloonstyle.bgcolor = "ffffffff"
+                        pol.style.linestyle.width = 2.0
         
     output_kml_data = kml.kml()
     
@@ -680,16 +577,12 @@ def serve_kml():
 
 if __name__ == "__main__":
     print("[Boot] Initializing system modules...", flush=True)
-    
-    # 1. Load disk files synchronously before doing anything else
     load_local_disk_cache()
     print("[Boot] System baseline ready.\n", flush=True)
     
-    # 2. Now start the harvester background thread to watch for updates
     worker = threading.Thread(target=background_alert_harvester, daemon=True)
     worker.start()
     
-    # 3. Finally, start Flask (its banner will now print cleanly below your progress updates)
     print("Starting KML Presenter server on local network...", flush=True)
-    print("Google Earth url: http://localhost:5000/alerts.kml", flush=True)
+    print("KML URL: http://localhost:5000/alerts.kml", flush=True)
     app.run(host='0.0.0.0', port=5000)
