@@ -3,13 +3,13 @@
 - As a small warning, you will need to adjust these values every time you update the program.
 
 
-### Adjust Google Earth syncing time (for easier tweaking)
+### Adjust ArcGIS Earth syncing time
 
 1. Right-click the "FOSS Live Alerts" folder or the added network link.
 2. Click on properties, then the refresh tab in the window that opened.
 3. Change the time-based refresh to be any interval you want. (I'd recommend setting it to `1 minute` for default use.)
-- Keep this in mind if you want to do anything below. When the list refreshes, Google Earth minimizes the folder, so I would recommend setting it to `Once` then refreshing manually for better tweaking.
-- Also, keep in mind that if your sync time is too low, it will cause syncing issues with Google Earth because it takes some time for it to refresh fully.
+- Keep this in mind if you want to do anything below. When the list refreshes, ArcGIS Earth minimizes the folder, so I would recommend setting it to `Once` then refreshing manually for better tweaking.
+- Also, keep in mind that if your sync time is too low, it will cause syncing issues with ArcGIS Earth & the script because it takes some time for it to refresh fully.
 
 
 ### Adjust the alert pulling frequency
@@ -26,7 +26,7 @@
 
 1. Open `app.py` in a text/code editor.
 2. Search for `url = f"{API_BASE_URL}/alert/area?min_lat=-90&max_lat=90&min_lon=-180&max_lon=180"`
-3. Use Google Earth to get the coordinates you want. (in the bottom left, "lat" and "lon" values)
+3. Use any tool to get the coordinates you want. ([reccomended site](https://www.gps-coordinates.net/))
 4. Change the "min_lat=#", "max_lat=#", "min_lon=#" & "max_lon=#" to the desired values.
 
 
@@ -38,12 +38,12 @@
 
 2. Copy an alert name from the `Uncategorized Alerts` folder
 3. (optional) Translate the text to your language to know what the alert type is.
-4. De-capitalize the text. (It will not pick up the name if it contains captial letters) (i recommend [this](https://decapitalize.eu/) site to do that)
+4. De-capitalize the text. (It will not pick up the name if it contains capital letters) (i recommend [this](https://decapitalize.eu/) site to do that)
 5. Add *quotes* (`""`) then paste the de-capitalized text on the left side.
-6. Then add a *colon* *space* *quotes* then add text into the quotes.
-7. Then add a comma (`,`) at the end of 
-8. Make sure the text is at the same place as all the other text. (Aka press tab once at the start of the text if it's not equal to the other text.)
+6. Then add a *colon* *space* *quotes*, then add text into the quotes.
+7. Then add a comma (`,`) at the end of the line
+8. Make sure the text is at the same place as all the other text. (Aka press `tab` once at the start of the text if it's not equal to the other text.)
 
-- This will create a folder in Google Earth that contains any alerts that match that text exactly.
+- This will create a folder in ArcGIS Earth that contains any alerts that match that text exactly.
 
 - Here's a template you can work off of: `"alert name": "Alert Category",`
