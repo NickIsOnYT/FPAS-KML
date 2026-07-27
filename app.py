@@ -59,15 +59,34 @@ def load_local_disk_cache():
     except Exception as dir_err:
         print(f"[Initialization] Error accessing cache directory: {dir_err}", flush=True)
 
-def get_kml_color(severity, alpha=180): # Slightly higher opacity for ArcGIS Earth
-    alpha_hex = f'{alpha:02x}'
+def get_kml_color_palette(severity):
+    """
+    Returns (polygon_color_kml, pin_color_kml) in KML aabbggrr format.
+    Pins match the hue family of their polygons but use maximum brightness/contrast.
+    """
     severity = severity.lower()
-    if 'minor' in severity: base_color = '00ffff'
-    elif 'moderate' in severity: base_color = '00a5ff'
-    elif 'severe' in severity: base_color = '0000ff'
-    elif 'extreme' in severity: base_color = '800080'
-    else: base_color = 'ffffff'
-    return alpha_hex + base_color
+    
+    if 'extreme' in severity:
+        poly_color = 'b0800080'  # Semi-transparent Purple (#800080)
+        pin_color  = 'ffff00ff'  # High-contrast Magenta / Neon Pink (#FF00FF)
+        
+    elif 'severe' in severity:
+        poly_color = 'b00000ff'  # Semi-transparent Red (#FF0000)
+        pin_color  = 'ff8080ff'  # High-contrast Light Coral Red (#FF8080)
+        
+    elif 'moderate' in severity:
+        poly_color = 'b000a5ff'  # Semi-transparent Orange (#FFA500)
+        pin_color  = 'ff00d7ff'  # High-contrast Electric Gold (#FFD700)
+        
+    elif 'minor' in severity:
+        poly_color = 'b000d7ff'  # Semi-transparent Yellow (#FFD700)
+        pin_color  = 'ff00ffff'  # High-contrast Pure Yellow (#FFFF00)
+        
+    else:  # Unknown / Notice
+        poly_color = 'b0aaaaaa'  # Semi-transparent Gray (#AAAAAA)
+        pin_color  = 'ffffffff'  # Pure White (#FFFFFF)
+        
+    return poly_color, pin_color
 
 def kml_color_to_hex(kml_color_str):
     """Converts a KML color string (aabbggrr) to a standard CSS hex string (rrggbb)."""
@@ -324,7 +343,7 @@ def serve_kml():
     geolocated_pin_buckets = {}
 
     for item in cached_alerts:
-        kml_color = get_kml_color(item["severity"])
+        poly_kml_color, pin_kml_color = get_kml_color_palette(item["severity"])
         raw_event = str(item.get("event_type", "Alert")).strip()
         
         cap_data_url = f"{API_BASE_URL}/alert/{item['id']}"
@@ -418,7 +437,8 @@ def serve_kml():
                     "body": pin_data['body'],
                     "links": pin_data.get('links', []),
                     "url": cap_data_url,
-                    "color": kml_color,
+                    "poly_color": poly_kml_color,
+                    "pin_color": pin_kml_color,
                     "raw_lon": raw_lon,
                     "raw_lat": raw_lat,
                     "geoms": pin_data["geoms"]
@@ -454,7 +474,7 @@ def serve_kml():
             source_links_by_index = []
             
             for idx, p in enumerate(stacked_pins, 1):
-                web_hex = kml_color_to_hex(p['color'])
+                web_hex = kml_color_to_hex(p['poly_color'])
                 section = f"""
                 <div style="border-left: 4px solid #{web_hex}; padding-left: 8px; margin-bottom: 12px;">
                     <strong style="font-size:14px;">#{idx}: {p['title']}</strong><br/>
@@ -496,14 +516,21 @@ def serve_kml():
             </div>
             """
 
-        # ArcGIS Earth Optimized Pin Styles
+        # Point Pin Definition
         pin = target_folder.newpoint(name=consolidated_title, coords=[(lead_pin['raw_lon'], lead_pin['raw_lat'])])
         pin.description = popup_content
         
-        # Standard Style (ArcGIS Earth processes simple icon styles much faster)
-        pin.style.iconstyle.color = lead_pin['color']
-        pin.style.iconstyle.scale = 1.0
-        pin.style.labelstyle.scale = 0.9
+        # StyleMap creates an expanded hit box and high-contrast styling for ArcGIS Earth
+        style_map = simplekml.StyleMap()
+        style_map.normalstyle.iconstyle.color = lead_pin['pin_color']
+        style_map.normalstyle.iconstyle.scale = 1.2
+        style_map.normalstyle.labelstyle.scale = 0.9
+        
+        style_map.highlightstyle.iconstyle.color = lead_pin['pin_color']
+        style_map.highlightstyle.iconstyle.scale = 1.7  # Expands click target when hovered over
+        style_map.highlightstyle.labelstyle.scale = 1.0
+        
+        pin.stylemap = style_map
 
         for p in stacked_pins:
             for geom in p["geoms"]:
@@ -526,9 +553,9 @@ def serve_kml():
                         
                         pol = target_folder.newpolygon(name=geom['event_title'].title(), outerboundaryis=geom["coords"])
                         pol.description = shape_popup
-                        pol.style.polystyle.color = p['color']
-                        pol.style.linestyle.color = p['color']
-                        pol.style.linestyle.width = 2.0  # Crisp polygon outlines in ArcGIS Earth
+                        pol.style.polystyle.color = p['poly_color']
+                        pol.style.linestyle.color = p['poly_color']
+                        pol.style.linestyle.width = 3.0  # Thicker outlines for easier feature clicking
                         
                         rendered_polygon_fingerprints.add(geo_fingerprint)
                         
@@ -561,9 +588,9 @@ def serve_kml():
                         
                         pol = target_folder.newpolygon(name=geom['event_title'].title(), outerboundaryis=circle_coords)
                         pol.description = shape_popup
-                        pol.style.polystyle.color = p['color']
-                        pol.style.linestyle.color = p['color']
-                        pol.style.linestyle.width = 2.0
+                        pol.style.polystyle.color = p['poly_color']
+                        pol.style.linestyle.color = p['poly_color']
+                        pol.style.linestyle.width = 3.0
         
     output_kml_data = kml.kml()
     
