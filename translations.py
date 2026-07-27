@@ -669,6 +669,7 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "snow warning": "Winter Weather",
     "snow watch": "Winter Weather",
     "nevadas fuertes": "Winter Weather",
+    "heladas extremas": "Winter Weather",
 
     # === FIRE & SMOKE ===
     "awareness_type=9, awareness_level=1": "Fire & Smoke",
@@ -833,6 +834,7 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "aviso de rissagas de nivel amarillo": "Marine & Coastal",
     "thunderstorm at sea warning": "Marine & Coastal",
     "افزایش وزش باد و افزایش ارتفاع امواج دریا": "Marine & Coastal",
+    "swell surge": "Marine & Coastal",
 
     # === AGRICULTURAL & ENVIRONMENTAL ===
     "air quality": "Agricultural & Environmental",
