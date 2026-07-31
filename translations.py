@@ -501,6 +501,7 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "tormentas fuertes con lluvias intensas y rafagas - aviso naranja": "Storms, Tornados, Floods & Winds",
     "very heavy rain, thundershowers": "Storms, Tornados, Floods & Winds",
     "inundación": "Storms, Tornados, Floods & Winds",
+    "lluvia tormenta eléctrica": "Storms, Tornados, Floods & Winds",
 
     # === TEMPERATURE EXTREMES ===
     "aviso de temperaturas máximas de nivel amarillo": "Temperature Extremes",
@@ -1006,6 +1007,7 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "weather update for country": "Multi-Purpose",
     "weather update for 48 hrs": "Multi-Purpose",
     "weather update for khyber pukhtukhwa": "Multi-Purpose",
+    "vigilance": "Multi-Purpose",
 
     # === MISC ===
     "anderes ereignis": "Misc",
