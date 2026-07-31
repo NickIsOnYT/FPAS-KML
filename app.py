@@ -75,23 +75,18 @@ def get_kml_color_palette(severity):
     if 'extreme' in sev_clean:
         poly_color = 'b0800080'  # Semi-transparent Purple (#800080)
         pin_color  = 'ffff00ff'  # High-contrast Magenta / Neon Pink (#FF00FF)
-        # don't change these values
     elif 'severe' in sev_clean:
         poly_color = 'b00000ff'  # Semi-transparent Red (#FF0000)
         pin_color  = 'ff8080ff'  # High-contrast Light Coral Red (#FF8080)
-        # don't change these values
     elif 'moderate' in sev_clean:
         poly_color = 'b000a5ff'  # Semi-transparent Orange (#FFA500)
         pin_color  = 'ff00d7ff'  # High-contrast Electric Gold (#FFD700)
-        # don't change these values
     elif 'minor' in sev_clean:
         poly_color = 'b0efae00'  # High-contrast Electric Light Blue (#00AEEF)
         pin_color  = 'ffe6d800'  # Semi-transparent Deep Cyan / Teal (#00D8E6)
-        # don't change these values
     else:  # Handles "UNKNOWN", "Notice", "Informational", etc.
         poly_color = 'b0aaaaaa'  # Semi-transparent Gray (#AAAAAA)
         pin_color  = 'ffffffff'  # Pure White (#FFFFFF)
-        # don't change these values
     return poly_color, pin_color
 
 def kml_color_to_hex(kml_color_str):
@@ -285,7 +280,6 @@ def background_alert_harvester():
                 print(f"[Background Thread] Server has {len(active_ids)} active alerts.", flush=True)
                 
                 with cache_lock:
-                    # Move previous cycle's 'New' alerts into the permanent seen set
                     PREVIOUSLY_SEEN_IDS.update(NEW_ALERT_IDS)
                     NEW_ALERT_IDS.clear()
 
@@ -319,7 +313,6 @@ def background_alert_harvester():
                                 
                                 with cache_lock:
                                     ALERT_CACHE[aid] = data
-                                    # Mark as newly ingested for this sync cycle
                                     if aid not in PREVIOUSLY_SEEN_IDS:
                                         NEW_ALERT_IDS.add(aid)
                             
@@ -472,8 +465,13 @@ def serve_kml():
 
     # Initialize folders
     new_alerts_folder = kml.newfolder(name="New Alerts")
+    new_subfolders = {}
+    
     category_folders = {}
     subcategory_folders = {}
+    
+    # Store unique region names per subfolder for generating folder descriptions
+    folder_region_trackers = {}
     
     sorted_active_categories = sorted(list(active_categories_and_subs.keys()))
     for cat_name in sorted_active_categories:
@@ -482,16 +480,28 @@ def serve_kml():
         sorted_active_subs = sorted(list(active_categories_and_subs[cat_name]))
         for sub_name in sorted_active_subs:
             sub_folder_key = (cat_name, sub_name)
-            subcategory_folders[sub_folder_key] = category_folders[cat_name].newfolder(name=sub_name)
+            sub_folder_obj = category_folders[cat_name].newfolder(name=sub_name)
+            subcategory_folders[sub_folder_key] = sub_folder_obj
+            folder_region_trackers[sub_folder_obj] = set()
 
     for coord_bucket, stacked_pins in geolocated_pin_buckets.items():
         lead_pin = stacked_pins[0]
         
-        # Target the "New Alerts" root folder if flagged in the latest refresh
+        # Determine target folder hierarchy
         if lead_pin["is_new"]:
-            target_folder = new_alerts_folder
+            new_sub_name = lead_pin["subcategory"]
+            if new_sub_name not in new_subfolders:
+                sub_f = new_alerts_folder.newfolder(name=new_sub_name)
+                new_subfolders[new_sub_name] = sub_f
+                folder_region_trackers[sub_f] = set()
+            target_folder = new_subfolders[new_sub_name]
         else:
             target_folder = subcategory_folders[(lead_pin["category"], lead_pin["subcategory"])]
+
+        # Collect regions into the parent subfolder's tracker
+        for p in stacked_pins:
+            if p.get("loc_name"):
+                folder_region_trackers[target_folder].add(p["loc_name"])
 
         if len(stacked_pins) > 1:
             consolidated_title = f"{lead_pin['subcategory']} ({len(stacked_pins)})"
@@ -545,19 +555,16 @@ def serve_kml():
         pin = target_folder.newpoint(name=consolidated_title, coords=[(lead_pin['raw_lon'], lead_pin['raw_lat'])])
         pin.description = popup_content
         
-        # StyleMap creates an expanded hit box and high-contrast styling for ArcGIS Earth
+        # StyleMap setup for pins
         style_map = simplekml.StyleMap()
         
-        # Normal State
         style_map.normalstyle.iconstyle.color = lead_pin['pin_color']
         style_map.normalstyle.iconstyle.scale = 1.2
-        # Explicitly use white pushpin base image so KML tinting renders true colors without yellow tint
         style_map.normalstyle.iconstyle.icon.href = 'http://maps.google.com/mapfiles/kml/pushpin/wht-pushpin.png'
         style_map.normalstyle.labelstyle.scale = 0.9
         
-        # Highlight State
         style_map.highlightstyle.iconstyle.color = lead_pin['pin_color']
-        style_map.highlightstyle.iconstyle.scale = 1.7  # Expands click target on hover
+        style_map.highlightstyle.iconstyle.scale = 1.7
         style_map.highlightstyle.iconstyle.icon.href = 'http://maps.google.com/mapfiles/kml/pushpin/wht-pushpin.png'
         style_map.highlightstyle.labelstyle.scale = 1.0
         
@@ -586,7 +593,7 @@ def serve_kml():
                         pol.description = shape_popup
                         pol.style.polystyle.color = p['poly_color']
                         pol.style.linestyle.color = p['poly_color']
-                        pol.style.linestyle.width = 3.0  # Thicker outlines for easier feature clicking
+                        pol.style.linestyle.width = 3.0
                         
                         rendered_polygon_fingerprints.add(geo_fingerprint)
                         
@@ -622,12 +629,21 @@ def serve_kml():
                         pol.style.polystyle.color = p['poly_color']
                         pol.style.linestyle.color = p['poly_color']
                         pol.style.linestyle.width = 3.0
-        
+
+    # Populate descriptions for all active subfolders listing affected regions
+    for folder_obj, regions_set in folder_region_trackers.items():
+        if regions_set:
+            sorted_regions = sorted(list(regions_set))
+            region_list_html = "<br/>".join([f"• {html.escape(r)}" for r in sorted_regions])
+            folder_obj.description = f"<b>Affected Regions ({len(sorted_regions)}):</b><br/>{region_list_html}"
+
     output_kml_data = kml.kml()
     
     del kml
     del category_folders
     del subcategory_folders
+    del new_subfolders
+    del folder_region_trackers
     del geolocated_pin_buckets
     gc.collect()  
     
