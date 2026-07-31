@@ -630,12 +630,12 @@ def serve_kml():
                         pol.style.linestyle.color = p['poly_color']
                         pol.style.linestyle.width = 3.0
 
-    # Populate descriptions for all active subfolders listing affected regions
+    # Populate descriptions for all active subfolders listing affected regions on a single line
     for folder_obj, regions_set in folder_region_trackers.items():
         if regions_set:
             sorted_regions = sorted(list(regions_set))
-            region_list_html = "<br/>".join([f"• {html.escape(r)}" for r in sorted_regions])
-            folder_obj.description = f"<b>Affected Regions ({len(sorted_regions)}):</b><br/>{region_list_html}"
+            horizontal_region_str = ", ".join([html.escape(r) for r in sorted_regions])
+            folder_obj.description = f"Regions: {horizontal_region_str}"
 
     output_kml_data = kml.kml()
     
