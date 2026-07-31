@@ -488,6 +488,13 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "tropical cyclone advisory/analysis": "Storms, Tornados, Floods & Winds",
     "tropical cyclone advisory/forecast": "Storms, Tornados, Floods & Winds",
     "العواصف الرعدية / خطوط العاصفة": "Storms, Tornados, Floods & Winds",
+    "heavy rain, strong winds": "Storms, Tornados, Floods & Winds",
+    "extremely heavy rain, strong winds": "Storms, Tornados, Floods & Winds",
+    "nullah flooding punjab": "Storms, Tornados, Floods & Winds",
+    "thunderstorms, wind, rough seas, gust, heavy rain": "Storms, Tornados, Floods & Winds",
+    "urban flooding for sindh": "Storms, Tornados, Floods & Winds",
+    "very heavy rain, strong winds": "Storms, Tornados, Floods & Winds",
+    "ضباب": "Storms, Tornados, Floods & Winds",
 
     # === TEMPERATURE EXTREMES ===
     "aviso de temperaturas máximas de nivel amarillo": "Temperature Extremes",
@@ -626,6 +633,11 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "severe high temperature warning": "Temperature Extremes",
     "heat emergency warning change": "Temperature Extremes",
     "heat emergency warning": "Temperature Extremes",
+    "velmi silná zátěž teplem": "Temperature Extremes",
+    "extrémní zátěž teplem": "Temperature Extremes",
+    "rising temperatures": "Temperature Extremes",
+    "ارتفاع درجات الحرارة": "Temperature Extremes",
+    "حرارة": "Temperature Extremes",
 
     # === WINTER WEATHER ===
     "awareness_type=6, awareness_level=1": "Winter Weather",
@@ -727,6 +739,7 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "fire ban in effect": "Fire & Smoke",
     "dense smoke advisory": "Fire & Smoke",
     "dense smoke warning": "Fire & Smoke",
+    "vysoké riziko požárů": "Fire & Smoke",
 
     # === EARTHQUAKE, TSUNAMI & VOLCANO ===
     "avalanche": "Earthquake, Tsunami & Volcano",
@@ -835,6 +848,8 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "thunderstorm at sea warning": "Marine & Coastal",
     "افزایش وزش باد و افزایش ارتفاع امواج دریا": "Marine & Coastal",
     "swell surge": "Marine & Coastal",
+    "upepo mkali na mawimbi makubwa": "Marine & Coastal",
+    "ارتفاع منسوب وسرعة جريان المياه": "Marine & Coastal",
 
     # === AGRICULTURAL & ENVIRONMENTAL ===
     "air quality": "Agricultural & Environmental",
@@ -931,6 +946,7 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "law enforcement warning": "Emergency & Civil Defense",
     "ohio gulch go evacuation status": "Emergency & Civil Defense",
     "indian creek set to go.": "Emergency & Civil Defense",
+    "telecommunications emergency": "Emergency & Civil Defense",
 
     # === AMBER ALERTS ===
     "amber alert": "Amber Alerts",
@@ -978,6 +994,9 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "agrometeorological disaster": "Multi-Purpose",
     "festival/fair/temple stampedes": "Multi-Purpose",
     "administrative message/follow up statement": "Multi-Purpose",
+    "weather update for 24 hrs": "Multi-Purpose",
+    "weather update for country": "Multi-Purpose",
+    "weather update for 48 hrs": "Multi-Purpose",
 
     # === MISC ===
     "anderes ereignis": "Misc",
