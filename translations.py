@@ -495,6 +495,11 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "urban flooding for sindh": "Storms, Tornados, Floods & Winds",
     "very heavy rain, strong winds": "Storms, Tornados, Floods & Winds",
     "ضباب": "Storms, Tornados, Floods & Winds",
+    "heavy rain in southeast sindh": "Storms, Tornados, Floods & Winds",
+    "heavy rain, thunderstorm": "Storms, Tornados, Floods & Winds",
+    "tormentas fuertes": "Storms, Tornados, Floods & Winds",
+    "tormentas fuertes con lluvias intensas y rafagas - aviso naranja": "Storms, Tornados, Floods & Winds",
+    "very heavy rain, thundershowers": "Storms, Tornados, Floods & Winds",
 
     # === TEMPERATURE EXTREMES ===
     "aviso de temperaturas máximas de nivel amarillo": "Temperature Extremes",
@@ -740,6 +745,7 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "dense smoke advisory": "Fire & Smoke",
     "dense smoke warning": "Fire & Smoke",
     "vysoké riziko požárů": "Fire & Smoke",
+    "požarna ogroženost - ekstremna ogroženost": "Fire & Smoke",
 
     # === EARTHQUAKE, TSUNAMI & VOLCANO ===
     "avalanche": "Earthquake, Tsunami & Volcano",
@@ -947,6 +953,7 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "ohio gulch go evacuation status": "Emergency & Civil Defense",
     "indian creek set to go.": "Emergency & Civil Defense",
     "telecommunications emergency": "Emergency & Civil Defense",
+    "區排警戒": "Emergency & Civil Defense",
 
     # === AMBER ALERTS ===
     "amber alert": "Amber Alerts",
@@ -997,6 +1004,7 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "weather update for 24 hrs": "Multi-Purpose",
     "weather update for country": "Multi-Purpose",
     "weather update for 48 hrs": "Multi-Purpose",
+    "weather update for khyber pukhtukhwa": "Multi-Purpose",
 
     # === MISC ===
     "anderes ereignis": "Misc",

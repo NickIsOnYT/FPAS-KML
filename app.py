@@ -23,13 +23,17 @@ API_BASE_URL = "https://alerts.kde.org"
 ALERT_CACHE = {}
 cache_lock = threading.Lock()
 
+# Delta Tracking Sets for "New Alerts" folder
+NEW_ALERT_IDS = set()
+PREVIOUSLY_SEEN_IDS = set()
+
 # Configure persistent local disk cache directory in AppData/Roaming
 CACHE_DIR = os.path.join(os.environ.get('APPDATA', os.path.expanduser('~')), 'FPAS_KML_Cache')
 os.makedirs(CACHE_DIR, exist_ok=True)
 
 def load_local_disk_cache():
     """Scans files to determine the total count and renders an active progress counter in console."""
-    global ALERT_CACHE
+    global ALERT_CACHE, PREVIOUSLY_SEEN_IDS
     print(f"[Initialization] Scanning local disk cache: {CACHE_DIR}", flush=True)
     try:
         json_files = [f for f in os.listdir(CACHE_DIR) if f.endswith(".json")]
@@ -45,6 +49,8 @@ def load_local_disk_cache():
                         data = json.load(f)
                         if data and "id" in data:
                             ALERT_CACHE[data["id"]] = data
+                            # Baseline disk alerts as already seen so they aren't tagged as 'New' on boot
+                            PREVIOUSLY_SEEN_IDS.add(data["id"])
                 except Exception as file_err:
                     print(f"\n[Initialization] Failed to load cache file {filename}: {file_err}", flush=True)
                 
@@ -65,27 +71,27 @@ def get_kml_color_palette(severity):
     Pins match the hue family of their polygons but use maximum brightness/contrast.
     """
     sev_clean = str(severity).strip().lower()
-    
+
     if 'extreme' in sev_clean:
         poly_color = 'b0800080'  # Semi-transparent Purple (#800080)
         pin_color  = 'ffff00ff'  # High-contrast Magenta / Neon Pink (#FF00FF)
-        
+        # don't change these values
     elif 'severe' in sev_clean:
         poly_color = 'b00000ff'  # Semi-transparent Red (#FF0000)
         pin_color  = 'ff8080ff'  # High-contrast Light Coral Red (#FF8080)
-        
+        # don't change these values
     elif 'moderate' in sev_clean:
         poly_color = 'b000a5ff'  # Semi-transparent Orange (#FFA500)
         pin_color  = 'ff00d7ff'  # High-contrast Electric Gold (#FFD700)
-        
+        # don't change these values
     elif 'minor' in sev_clean:
         poly_color = 'b0efae00'  # High-contrast Electric Light Blue (#00AEEF)
         pin_color  = 'ffe6d800'  # Semi-transparent Deep Cyan / Teal (#00D8E6)
-        
+        # don't change these values
     else:  # Handles "UNKNOWN", "Notice", "Informational", etc.
         poly_color = 'b0aaaaaa'  # Semi-transparent Gray (#AAAAAA)
         pin_color  = 'ffffffff'  # Pure White (#FFFFFF)
-        
+        # don't change these values
     return poly_color, pin_color
 
 def kml_color_to_hex(kml_color_str):
@@ -266,7 +272,7 @@ def fetch_single_alert(alert_id):
     return alert_id, None
 
 def background_alert_harvester():
-    global ALERT_CACHE
+    global ALERT_CACHE, NEW_ALERT_IDS, PREVIOUSLY_SEEN_IDS
     print("[Background Thread] Started alert harvester worker.", flush=True)
     while True:
         try:
@@ -279,10 +285,15 @@ def background_alert_harvester():
                 print(f"[Background Thread] Server has {len(active_ids)} active alerts.", flush=True)
                 
                 with cache_lock:
+                    # Move previous cycle's 'New' alerts into the permanent seen set
+                    PREVIOUSLY_SEEN_IDS.update(NEW_ALERT_IDS)
+                    NEW_ALERT_IDS.clear()
+
                     cached_ids = list(ALERT_CACHE.keys())
                     for cid in cached_ids:
                         if cid not in active_ids:
                             del ALERT_CACHE[cid]
+                            PREVIOUSLY_SEEN_IDS.discard(cid)
                             disk_path = os.path.join(CACHE_DIR, f"{cid}.json")
                             if os.path.exists(disk_path):
                                 try: os.remove(disk_path)
@@ -308,6 +319,9 @@ def background_alert_harvester():
                                 
                                 with cache_lock:
                                     ALERT_CACHE[aid] = data
+                                    # Mark as newly ingested for this sync cycle
+                                    if aid not in PREVIOUSLY_SEEN_IDS:
+                                        NEW_ALERT_IDS.add(aid)
                             
                             if processed_count % 10 == 0 or processed_count == total_new:
                                 percent = (processed_count / total_new) * 100
@@ -337,6 +351,7 @@ def serve_kml():
     
     with cache_lock:
         cached_alerts = sorted(list(ALERT_CACHE.values()), key=lambda x: x.get("raw_effective", ""), reverse=True)
+        current_new_ids = set(NEW_ALERT_IDS)
         
     active_categories_and_subs = {} 
     rendered_polygon_fingerprints = set()
@@ -349,6 +364,7 @@ def serve_kml():
         cap_data_url = f"{API_BASE_URL}/alert/{item['id']}"
         effective_str = item.get("effective", "N/A")
         expires_str = item.get("expires", "N/A")
+        is_new_alert = item["id"] in current_new_ids
 
         data_groups = {}
         for geom in item.get("geometries", []):
@@ -429,6 +445,7 @@ def serve_kml():
                 geolocated_pin_buckets[coord_bucket].append({
                     "category": category_name,
                     "subcategory": target_subcategory_string,
+                    "is_new": is_new_alert,
                     "title": pin_data['title'],
                     "loc_name": loc_name,
                     "severity": str(item.get("severity", "Unknown")).upper(),
@@ -446,12 +463,15 @@ def serve_kml():
 
     for coord_bucket, stacked_pins in geolocated_pin_buckets.items():
         lead_pin = stacked_pins[0]
-        c_name = lead_pin["category"]
-        s_name = lead_pin["subcategory"]
-        if c_name not in active_categories_and_subs:
-            active_categories_and_subs[c_name] = set()
-        active_categories_and_subs[c_name].add(s_name)
+        if not lead_pin["is_new"]:
+            c_name = lead_pin["category"]
+            s_name = lead_pin["subcategory"]
+            if c_name not in active_categories_and_subs:
+                active_categories_and_subs[c_name] = set()
+            active_categories_and_subs[c_name].add(s_name)
 
+    # Initialize folders
+    new_alerts_folder = kml.newfolder(name="New Alerts")
     category_folders = {}
     subcategory_folders = {}
     
@@ -466,7 +486,12 @@ def serve_kml():
 
     for coord_bucket, stacked_pins in geolocated_pin_buckets.items():
         lead_pin = stacked_pins[0]
-        target_folder = subcategory_folders[(lead_pin["category"], lead_pin["subcategory"])]
+        
+        # Target the "New Alerts" root folder if flagged in the latest refresh
+        if lead_pin["is_new"]:
+            target_folder = new_alerts_folder
+        else:
+            target_folder = subcategory_folders[(lead_pin["category"], lead_pin["subcategory"])]
 
         if len(stacked_pins) > 1:
             consolidated_title = f"{lead_pin['subcategory']} ({len(stacked_pins)})"
