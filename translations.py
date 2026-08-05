@@ -502,6 +502,7 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "very heavy rain, thundershowers": "Storms, Tornados, Floods & Winds",
     "inundación": "Storms, Tornados, Floods & Winds",
     "lluvia tormenta eléctrica": "Storms, Tornados, Floods & Winds",
+    "tormentas muy fuertes y severas": "Storms, Tornados, Floods & Winds",
 
     # === TEMPERATURE EXTREMES ===
     "aviso de temperaturas máximas de nivel amarillo": "Temperature Extremes",
