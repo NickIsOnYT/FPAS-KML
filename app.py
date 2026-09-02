@@ -761,10 +761,12 @@ function escapeHtml(value) {
 }
 function popupForAlerts(alertsAtCenter) {
     const sections = alertsAtCenter.map((alert, index) => {
+        const regions = [...new Set((alert.geometries || []).map(geometry => geometry.location_name).filter(Boolean))].join(', ');
+        const region = regions ? `<div class="popup-section"><div class="popup-label">Region</div>${escapeHtml(regions)}</div>` : '';
         const instructions = alert.instruction ? `<div class="popup-section"><div class="popup-label">Instructions</div>${escapeHtml(alert.instruction).replace(/\\n/g, '<br>')}</div>` : '';
         const urls = (alert.links || []).map(url => `<a href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(url)}</a>`).join('<br>');
         const links = urls ? `<div class="popup-section"><div class="popup-label">Additional links</div>${urls}</div>` : '';
-        return `<section class="popup-alert" style="--popup-color:${alert.polygon_color}"><div class="popup-alert-heading">#${index + 1} &middot; ${escapeHtml(alert.event_type)}</div><div class="popup-meta">${escapeHtml(alert.severity)} &middot; Active ${escapeHtml(alert.effective)} to ${escapeHtml(alert.expires)}</div><div class="popup-section"><div class="popup-label">Description</div>${escapeHtml(alert.description).replace(/\\n/g, '<br>')}</div>${instructions}${links}<div class="popup-source"><a href="${escapeHtml(alert.source_url)}" target="_blank" rel="noopener">View source CAP</a></div></section>`;
+        return `<section class="popup-alert" style="--popup-color:${alert.polygon_color}"><div class="popup-alert-heading">#${index + 1} &middot; ${escapeHtml(alert.event_type)}</div><div class="popup-meta">${escapeHtml(alert.severity)} &middot; Active ${escapeHtml(alert.effective)} to ${escapeHtml(alert.expires)}</div>${region}<div class="popup-section"><div class="popup-label">Description</div>${escapeHtml(alert.description).replace(/\\n/g, '<br>')}</div>${instructions}${links}<div class="popup-source"><a href="${escapeHtml(alert.source_url)}" target="_blank" rel="noopener">View source CAP</a></div></section>`;
     }).join('');
     const heading = alertsAtCenter.length > 1 ? `${alertsAtCenter.length} alerts at this location` : escapeHtml(alertsAtCenter[0].event_type);
     return `<div class="popup-card"><div class="popup-title">${heading}</div>${sections}</div>`;
