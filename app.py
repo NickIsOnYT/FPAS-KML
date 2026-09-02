@@ -15,6 +15,7 @@ import re         # Detect links in alert text
 import html       # Escape popup link content safely
 import uuid
 import socket
+from datetime import datetime, timezone
 
 import translations
 
@@ -35,6 +36,8 @@ os.makedirs(CACHE_DIR, exist_ok=True)
 VISIBILITY_SETTINGS_PATH = os.path.join(CACHE_DIR, 'visibility_settings.json')
 CUSTOM_ALERTS_PATH = os.path.join(CACHE_DIR, 'custom_alerts.json')
 settings_lock = threading.Lock()
+refresh_requested = threading.Event()
+REFRESH_INTERVAL_SECONDS = 60
 
 def load_hidden_alert_ids():
     try:
@@ -128,6 +131,27 @@ def get_alert_display_name(alert):
         return f"{event_name} - {', '.join(locations)}"
     return event_name
 
+def get_alert_start_time(alert):
+    value = str(alert.get("raw_effective") or alert.get("effective") or "")
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).replace(tzinfo=timezone.utc) if "+" not in value else datetime.fromisoformat(value)
+    except ValueError:
+        return datetime.min.replace(tzinfo=timezone.utc)
+
+def get_unique_alert_links(alert):
+    links = []
+    seen_urls = set()
+    for geometry in alert.get("geometries", []):
+        for link in geometry.get("links", []):
+            if isinstance(link, (tuple, list)) and len(link) >= 2:
+                url = str(link[1]).strip()
+            else:
+                url = str(link).strip()
+            if url and url not in seen_urls:
+                seen_urls.add(url)
+                links.append(url)
+    return links
+
 def get_web_alerts():
     hidden_ids = load_hidden_alert_ids()
     with cache_lock:
@@ -174,14 +198,17 @@ def get_web_alerts():
                 if geometry.get("instruction")
             ), ""),
             "source_url": alert.get("source_url") or f"{API_BASE_URL}/alert/{alert.get('id', '')}",
-            "links": [link for geometry in alert.get("geometries", []) for link in geometry.get("links", [])],
+            "links": [
+                link for link in get_unique_alert_links(alert)
+                if link != (alert.get("source_url") or f"{API_BASE_URL}/alert/{alert.get('id', '')}")
+            ],
             "center": [center_lat, center_lon],
             "polygon_color": f"#{kml_color_to_hex(polygon_color)}",
             "pin_color": f"#{kml_color_to_hex(pin_color)}",
             "geometries": geometries
         })
 
-    return sorted(web_alerts, key=lambda alert: alert.get("effective", ""), reverse=True)
+    return sorted(web_alerts, key=get_alert_start_time, reverse=True)
 
 def load_local_disk_cache():
     """Scans files to determine the total count and renders an active progress counter in console."""
@@ -294,7 +321,7 @@ def build_sources_html(title, cap_url, body_text, extra_links=None):
         f'<div><b>{html.escape(title)}:</b> <a href="{html.escape(cap_url, quote=True)}" target="_blank">View CAP JSON</a></div>'
     ]
 
-    seen_urls = set()
+    seen_urls = {cap_url} if cap_url else set()
     for source in extra_links or []:
         if isinstance(source, (tuple, list)) and len(source) >= 2:
             display_text, full_url = source[0], source[1]
@@ -481,7 +508,8 @@ def background_alert_harvester():
         except Exception as e:
             print(f"[Background Thread] Error during harvesting: {e}", flush=True)
             
-        time.sleep(60)
+        refresh_requested.wait(REFRESH_INTERVAL_SECONDS)
+        refresh_requested.clear()
 
 @app.route('/')
 def serve_home():
@@ -506,8 +534,13 @@ def serve_home():
         a:hover, a:focus { background: var(--panel-2); border-color: var(--accent); outline: none; }
         .name { display: block; font-size: 1.1rem; font-weight: 700; margin-bottom: .25rem; }
         .detail { color: var(--muted); font-size: .85rem; }
+        .refresh-bar { align-items: center; background: var(--panel); border: 1px solid var(--line); display: inline-flex; gap: 9px; margin: 1.25rem 0; max-width: 100%; padding: 8px; }
+        .refresh-bar button { background: var(--panel-2); border: 1px solid var(--line); border-radius: 3px; color: var(--ink); cursor: pointer; flex: 0 1 180px; font: inherit; font-weight: 700; min-height: 36px; padding: 7px 10px; }
+        .refresh-bar button:hover { border-color: var(--accent); color: var(--accent); }
+        .refresh-bar button:focus { border-color: var(--accent); outline: 2px solid #43d6bd33; }
+        .refresh-timer { color: var(--muted); font-size: 14px; min-width: 78px; text-align: right; }
         footer { color: var(--muted); font-size: .8rem; margin-top: 2rem; }
-        @media (max-width: 560px) { body { padding: 1.25rem .75rem; } h1 { font-size: 2.25rem; } .intro { font-size: .9rem; margin-bottom: 1.25rem; } .links { grid-template-columns: 1fr; } a { padding: .95rem 1rem; } .name { font-size: 1rem; } .detail { font-size: .8rem; } }
+        @media (max-width: 560px) { body { padding: 1.25rem .75rem; } h1 { font-size: 2.25rem; } .intro { font-size: .9rem; margin-bottom: 1.25rem; } .links { grid-template-columns: 1fr; } a { padding: .95rem 1rem; } .name { font-size: 1rem; } .detail { font-size: .8rem; } .refresh-bar { margin: 1rem 0; max-width: 100%; } .refresh-bar button { flex-basis: 150px; } .refresh-timer { font-size: 13px; } }
     </style>
 </head>
 <body>
@@ -515,6 +548,7 @@ def serve_home():
         <div class="eyebrow">FOSSWARN / FPAS</div>
         <h1>FPAS KML</h1>
         <p class="intro">Local alert tools and feeds hosted by this server.</p>
+        <div class="refresh-bar"><button id="server-refresh" type="button">Refresh server</button><span class="refresh-timer" id="refresh-countdown">Next: 60s</span></div>
         <nav class="links" aria-label="Hosted pages and feeds">
             <a href="{{ url_for('serve_map') }}"><span class="name">Live alert map</span><span class="detail">OpenStreetMap view with filters and alert details</span></a>
             <a href="{{ url_for('visibility_settings') }}"><span class="name">Alert settings</span><span class="detail">Choose visible alerts and manage custom alerts</span></a>
@@ -523,9 +557,42 @@ def serve_home():
         </nav>
         <footer>Map and feeds use the locally harvested FPAS alert cache.</footer>
     </main>
+    <script>
+    let secondsUntilRefresh = 60;
+    let refreshInProgress = false;
+    async function refreshServer() {
+        if (refreshInProgress) return;
+        refreshInProgress = true;
+        const button = document.querySelector('#server-refresh');
+        button.disabled = true;
+        button.textContent = 'Refreshing...';
+        try {
+            const response = await fetch('{{ url_for('request_server_refresh') }}', { method: 'POST' });
+            if (!response.ok) throw new Error('Refresh request failed');
+            secondsUntilRefresh = 60;
+        } catch (error) {
+            button.textContent = 'Refresh failed';
+        } finally {
+            button.disabled = false;
+            button.textContent = 'Refresh server';
+            refreshInProgress = false;
+        }
+    }
+    document.querySelector('#server-refresh').addEventListener('click', refreshServer);
+    setInterval(() => {
+        secondsUntilRefresh = Math.max(0, secondsUntilRefresh - 1);
+        document.querySelector('#refresh-countdown').textContent = `Next: ${secondsUntilRefresh}s`;
+        if (secondsUntilRefresh === 0) refreshServer();
+    }, 1000);
+    </script>
 </body>
 </html>
 """)
+
+@app.route('/refresh', methods=['POST'])
+def request_server_refresh():
+    refresh_requested.set()
+    return jsonify({"status": "refresh_requested"})
 
 @app.route('/alerts.json')
 def serve_alerts_json():
@@ -548,6 +615,8 @@ def serve_map():
         .app { display: grid; grid-template-columns: minmax(300px, 370px) 1fr; height: 100%; min-height: 0; }
         aside { background: var(--panel); border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; z-index: 500; }
         header { padding: 22px 22px 16px; border-bottom: 1px solid var(--line); }
+        .home-link { color: var(--accent); display: inline-block; font-size: 11px; font-weight: 700; margin-bottom: 12px; text-decoration: none; }
+        .home-link:hover { text-decoration: underline; }
         .eyebrow { color: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
         h1 { font-size: 25px; letter-spacing: .01em; margin: 5px 0 3px; }
         .subtitle { color: var(--muted); font-size: 13px; margin: 0; }
@@ -558,7 +627,11 @@ def serve_map():
         button { cursor: pointer; font-weight: 700; }
         button:hover { border-color: var(--accent); color: var(--accent); }
         .stats { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; padding: 12px 16px 5px; }
-        #alert-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 5px 10px 20px; }
+        #alert-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 5px 10px 20px; scrollbar-color: var(--accent) var(--panel-2); scrollbar-width: thin; }
+        #alert-list::-webkit-scrollbar, .leaflet-popup-content::-webkit-scrollbar { width: 8px; }
+        #alert-list::-webkit-scrollbar-track, .leaflet-popup-content::-webkit-scrollbar-track { background: var(--panel-2); border-radius: 4px; }
+        #alert-list::-webkit-scrollbar-thumb, .leaflet-popup-content::-webkit-scrollbar-thumb { background: #347f76; border: 2px solid var(--panel-2); border-radius: 4px; }
+        #alert-list::-webkit-scrollbar-thumb:hover, .leaflet-popup-content::-webkit-scrollbar-thumb:hover { background: var(--accent); }
         .alert-row { border-left: 4px solid var(--severity); border-bottom: 1px solid var(--line); cursor: pointer; padding: 12px 10px 11px; transition: background .15s ease; }
         .alert-row:hover, .alert-row.active { background: #1b2a2d; }
         .alert-title { font-size: 14px; font-weight: 700; line-height: 1.3; }
@@ -570,7 +643,7 @@ def serve_map():
         .map-status { background: #101a1ddd; border: 1px solid var(--line); bottom: 16px; color: var(--muted); font-size: 11px; padding: 7px 10px; position: absolute; right: 16px; z-index: 400; }
         .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: #172427; color: var(--ink); }
         .leaflet-popup-content-wrapper { max-height: min(360px, calc(100vh - 32px)); overflow: hidden; }
-        .leaflet-popup-content { font-family: "Trebuchet MS", "Segoe UI", sans-serif; font-size: 13px; line-height: 1.45; margin: 14px 16px; max-height: min(332px, calc(100vh - 60px)); max-width: 320px; overflow-y: auto; padding-right: 7px; }
+        .leaflet-popup-content { font-family: "Trebuchet MS", "Segoe UI", sans-serif; font-size: 13px; line-height: 1.45; margin: 14px 16px; max-height: min(332px, calc(100vh - 60px)); max-width: 320px; overflow-y: auto; padding-right: 7px; scrollbar-color: var(--accent) var(--panel-2); scrollbar-width: thin; }
         .popup-title { border-left: 4px solid var(--popup-color); font-size: 17px; font-weight: 700; padding-left: 8px; }
         .popup-alert { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 12px; }
         .popup-alert-heading { border-left: 4px solid var(--popup-color); font-size: 15px; font-weight: 700; padding-left: 8px; }
@@ -589,6 +662,7 @@ def serve_map():
 <main class="app">
     <aside>
         <header>
+            <a class="home-link" href="{{ url_for('serve_home') }}">&larr; Main page</a>
             <div class="eyebrow">FOSSWARN / FPAS</div>
             <h1>Live alert map</h1>
             <p class="subtitle">Active alerts from the global CAP feed</p>
@@ -613,6 +687,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:
 const layers = L.layerGroup().addTo(map);
 let alerts = [];
 let hasFitted = false;
+let hasLoadedAlerts = false;
 
 function severityKey(value) {
     const severity = String(value || '').toLowerCase();
@@ -672,24 +747,42 @@ function render() {
         const radius = count > 1 ? 0.0015 : 0;
         const markerPosition = [alert.center[0] + Math.sin(angle) * radius, alert.center[1] + Math.cos(angle) * radius];
         const group = drawAlert(alert, markerPosition, popupForAlerts(alertsByCenter[centerKey])).addTo(layers);
-        const row = list.querySelector(`[data-id="${CSS.escape(alert.id)}"]`);
+        const row = Array.from(list.querySelectorAll('.alert-row')).find(item => item.dataset.id === alert.id);
         row?.addEventListener('click', () => { document.querySelectorAll('.alert-row').forEach(item => item.classList.remove('active')); row.classList.add('active'); map.flyTo(alert.center, Math.max(map.getZoom(), 6), { duration: .7 }); group.eachLayer(layer => layer.openPopup?.()); });
     });
     document.querySelector('#count').textContent = `${filtered.length} of ${alerts.length} alerts shown`;
     document.querySelector('#map-status').textContent = `${filtered.length} mapped alerts`;
-    if (!hasFitted && filtered.length) { const bounds = L.featureGroup([...layers.getLayers()]).getBounds(); if (bounds.isValid()) map.fitBounds(bounds.pad(.12), { maxZoom: 8 }); hasFitted = true; }
+    if (!hasFitted && filtered.length) { const bounds = L.latLngBounds(filtered.map(alert => alert.center)); if (bounds.isValid()) map.fitBounds(bounds.pad(.12), { maxZoom: 8 }); hasFitted = true; }
 }
 async function loadAlerts() {
     document.querySelector('#refresh').disabled = true;
-    try { const response = await fetch('/alerts.json', { cache: 'no-store' }); if (!response.ok) throw new Error('Feed unavailable'); const data = await response.json(); alerts = data.alerts || []; document.querySelector('#updated').textContent = `Updated ${new Date(data.updated).toLocaleTimeString()}`; render(); }
-    catch (error) { document.querySelector('#map-status').textContent = 'Alert feed unavailable'; document.querySelector('#count').textContent = 'Unable to load alerts'; }
+    try {
+        const response = await fetch('/alerts.json', { cache: 'no-store' });
+        if (!response.ok) throw new Error(`Feed unavailable (${response.status})`);
+        const data = await response.json();
+        alerts = data.alerts || [];
+        hasLoadedAlerts = true;
+        document.querySelector('#updated').textContent = `Updated ${new Date(data.updated).toLocaleTimeString()}`;
+    } catch (error) {
+        console.error('Unable to fetch alert feed:', error);
+        document.querySelector('#map-status').textContent = hasLoadedAlerts ? 'Refresh failed; showing previous data' : 'Alert feed unavailable';
+        document.querySelector('#count').textContent = hasLoadedAlerts ? `${alerts.length} alerts shown` : 'Unable to load alerts';
+        document.querySelector('#refresh').disabled = false;
+        return;
+    }
+    try {
+        render();
+    } catch (error) {
+        console.error('Unable to render alert feed:', error);
+        document.querySelector('#map-status').textContent = 'Alert data loaded; map display failed';
+        document.querySelector('#count').textContent = `${alerts.length} alerts loaded`;
+    }
     finally { document.querySelector('#refresh').disabled = false; }
 }
 document.querySelector('#search').addEventListener('input', render);
 document.querySelector('#severity').addEventListener('change', render);
 document.querySelector('#refresh').addEventListener('click', loadAlerts);
 loadAlerts();
-setInterval(loadAlerts, 60000);
 </script>
 </body>
 </html>
@@ -725,8 +818,9 @@ def visibility_settings():
 
         if action == "add_custom" and custom_error:
             with cache_lock:
-                active_alerts = sorted(list(ALERT_CACHE.values()), key=lambda alert: alert.get("raw_effective", ""), reverse=True)
+                active_alerts = sorted(list(ALERT_CACHE.values()), key=get_alert_start_time, reverse=True)
             invalid_field = "custom_polygon" if "polygon" in custom_error.lower() else "custom_title"
+            custom_alerts = sorted(custom_alerts, key=get_alert_start_time, reverse=True)
             return render_template_string(SETTINGS_TEMPLATE, active_alerts=active_alerts, hidden_ids=load_hidden_alert_ids(), custom_alerts=custom_alerts, get_alert_display_name=get_alert_display_name, custom_error=custom_error, custom_form=request.form.to_dict(), invalid_field=invalid_field)
 
         with cache_lock:
@@ -742,12 +836,12 @@ def visibility_settings():
     with cache_lock:
         active_alerts = sorted(
             list(ALERT_CACHE.values()),
-            key=lambda alert: alert.get("raw_effective", ""),
+            key=get_alert_start_time,
             reverse=True
         )
 
     hidden_ids = load_hidden_alert_ids()
-    custom_alerts = load_custom_alerts()
+    custom_alerts = sorted(load_custom_alerts(), key=get_alert_start_time, reverse=True)
     return render_template_string(SETTINGS_TEMPLATE,
         active_alerts=active_alerts, hidden_ids=hidden_ids, custom_alerts=custom_alerts,
         get_alert_display_name=get_alert_display_name, custom_error=None, custom_form={}, invalid_field=None)
@@ -760,32 +854,39 @@ SETTINGS_TEMPLATE = """
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>FPAS KML visibility</title>
     <style>
-        body { font-family: system-ui, sans-serif; line-height: 1.45; margin: 2rem auto; max-width: 58rem; padding: 0 1rem; color: #202124; }
+        :root { --ink: #eef4f5; --muted: #91a4a8; --panel: #111b1d; --panel-2: #172427; --line: #2a3b3f; --accent: #43d6bd; }
+        * { box-sizing: border-box; }
+        body { background: #0c1315; color: var(--ink); font-family: "Trebuchet MS", "Segoe UI", sans-serif; line-height: 1.45; margin: 0 auto; max-width: 58rem; padding: 2rem 1rem; }
         h1 { margin-bottom: .4rem; }
-        details { border: 1px solid #c9c9c9; border-radius: 4px; padding: .7rem 1rem; }
+        .home-link { color: var(--accent); display: inline-block; font-size: .8rem; font-weight: 700; margin-bottom: 1.1rem; text-decoration: none; }
+        .home-link:hover { text-decoration: underline; }
+        details { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: .7rem 1rem; }
         summary { cursor: pointer; font-weight: 600; }
-        .alert { border-top: 1px solid #e2e2e2; padding: .7rem 0; }
+        .alert { border-top: 1px solid var(--line); padding: .7rem 0; }
         .alert:first-of-type { margin-top: .6rem; }
         .alert label { display: block; cursor: pointer; }
         .alert-name { font-weight: 600; }
-        .metadata { color: #5f6368; font-size: .9rem; margin-left: 1.6rem; }
-        button { cursor: pointer; font-size: 1rem; margin-top: 1rem; padding: .55rem 1rem; }
-        .saved { color: #137333; font-weight: 600; }
-        .error { color: #b3261e; font-weight: 600; }
-        .empty { color: #5f6368; margin-top: 1rem; }
+        .metadata { color: var(--muted); font-size: .9rem; margin-left: 1.6rem; }
+        button { background: var(--panel-2); border: 1px solid var(--line); border-radius: 3px; color: var(--ink); cursor: pointer; font-size: 1rem; margin-top: 1rem; padding: .55rem 1rem; }
+        button:hover { border-color: var(--accent); color: var(--accent); }
+        .saved { color: var(--accent); font-weight: 600; }
+        .error { color: #ff8a80; font-weight: 600; }
+        .empty { color: var(--muted); margin-top: 1rem; }
+        .custom-section { margin-top: 1.5rem; }
         .custom-form { display: grid; gap: .7rem; margin-top: 1rem; }
         .custom-form label { font-weight: 600; }
-        .custom-form input, .custom-form select, .custom-form textarea { display: block; margin-top: .25rem; width: 100%; }
+        .custom-form input, .custom-form select, .custom-form textarea { background: var(--panel-2); border: 1px solid var(--line); border-radius: 3px; color: var(--ink); display: block; margin-top: .25rem; width: 100%; }
         .custom-form textarea { min-height: 80px; resize: vertical; }
         .field-label { align-items: center; display: flex; gap: .35rem; }
         .help-mark { align-items: center; background: #f1f3f4; border: 1px solid #9aa0a6; border-radius: 50%; color: #3c4043; cursor: help; display: inline-flex; font-size: .75rem; font-weight: 700; height: 1.25rem; justify-content: center; line-height: 1.1rem; width: 1.25rem; }
+        .help-tip { background: #202124; border-radius: 3px; color: #fff; display: inline-block; font-size: .75rem; font-weight: 400; margin-left: .4rem; max-width: 260px; padding: .35rem .5rem; vertical-align: middle; }
         .invalid input, .invalid textarea, .invalid select { border: 2px solid #b3261e; }
         .invalid .help-mark { border-color: #b3261e; color: #b3261e; }
         .custom-grid { display: grid; gap: .7rem; grid-template-columns: 1fr 1fr; }
-        .custom-item { border-top: 1px solid #e2e2e2; margin-top: .7rem; padding: .7rem 0; }
+        .custom-item { border-top: 1px solid var(--line); margin-top: .7rem; padding: .7rem 0; }
         .custom-item form { display: inline; margin-right: .5rem; }
         .disabled { color: #777; }
-        code { background: #f1f3f4; padding: .1rem .25rem; }
+        code { background: var(--panel-2); color: var(--accent); padding: .1rem .25rem; }
         @media (max-width: 600px) {
             body { margin: 1rem auto; padding: 0 .75rem; }
             h1 { font-size: 1.55rem; }
@@ -799,13 +900,14 @@ SETTINGS_TEMPLATE = """
     </style>
 </head>
 <body>
+    <a class="home-link" href="{{ url_for('serve_home') }}">&larr; Main page</a>
     <h1>KML alert visibility</h1>
     <p>Choose which active alerts should appear in the KML file.</p>
     {% if request.args.get('saved') %}<p class="saved">Visibility settings saved.</p>{% endif %}
     {% if request.args.get('custom_saved') %}<p class="saved">Custom alert settings saved.</p>{% endif %}
     {% if custom_error %}<p class="error">{{ custom_error }}</p>{% endif %}
     <form method="post">
-        <details open>
+        <details>
             <summary>Active alerts ({{ active_alerts|length }})</summary>
             {% for alert in active_alerts %}
             <div class="alert">
@@ -821,7 +923,7 @@ SETTINGS_TEMPLATE = """
         </details>
         <button type="submit">Save visibility settings</button>
     </form>
-    <details>
+    <details class="custom-section">
         <summary>Custom alerts ({{ custom_alerts|length }})</summary>
         <p>Create map/KML-only alerts for testing or demonstrations. They are stored separately from FPAS alerts.</p>
         <form class="custom-form" method="post">
@@ -850,6 +952,23 @@ SETTINGS_TEMPLATE = """
         {% else %}<p class="empty">No custom alerts created.</p>{% endfor %}
     </details>
 </body>
+<script>
+document.querySelectorAll('.help-mark').forEach(mark => {
+    mark.setAttribute('role', 'button');
+    mark.setAttribute('tabindex', '0');
+    const showHelp = () => {
+        document.querySelectorAll('.help-tip').forEach(tip => tip.remove());
+        const tip = document.createElement('span');
+        tip.className = 'help-tip';
+        tip.textContent = mark.title;
+        mark.after(tip);
+    };
+    mark.addEventListener('click', showHelp);
+    mark.addEventListener('keydown', event => {
+        if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); showHelp(); }
+    });
+});
+</script>
 </html>
 """
 
