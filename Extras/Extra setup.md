@@ -38,8 +38,7 @@
 
 2. Copy an alert name from the `Uncategorized Alerts` folder
 3. (optional) Translate the text to your language to know what the alert type is.
-4. De-capitalize the text. (It will not pick up the name if it contains capital letters) (i recommend [this](https://decapitalize.eu/) site to do that)
-5. Add *quotes* (`""`) then paste the de-capitalized text on the left side.
+4. Add *quotes* (`""`) then paste the alert text on the left side.
 6. Then add a *colon* *space* *quotes*, then add text into the quotes.
 7. Then add a comma (`,`) at the end of the line
 8. Make sure the text is at the same place as all the other text. (Aka press `tab` once at the start of the text if it's not equal to the other text.)

@@ -7,11 +7,27 @@ class SmartCategoryMapping(dict):
     but dynamically intercepts lookups to catch patterns like Amber Alerts,
     broken weather strings, or alerts containing variable measurements/dates.
     """
+    @staticmethod
+    def _normalize_key(key):
+        return str(key).strip().lower()
+
+    def __init__(self, mapping=None, **kwargs):
+        normalized_mapping = {
+            self._normalize_key(key): value
+            for key, value in (mapping or {}).items()
+        }
+        normalized_mapping.update({
+            self._normalize_key(key): value
+            for key, value in kwargs.items()
+        })
+        super().__init__(normalized_mapping)
+
     def __contains__(self, key):
-        if super().__contains__(key):
+        normalized_key = self._normalize_key(key)
+        if super().__contains__(normalized_key):
             return True
         
-        k = str(key).lower()
+        k = normalized_key
         
         # Dynamic weather & air quality lookups (handles embedded dates/measurements/PM counts)
         if "particle pollution" in k or "health advisory" in k or "ozone" in k:
@@ -32,10 +48,11 @@ class SmartCategoryMapping(dict):
         return False
 
     def __getitem__(self, key):
+        normalized_key = self._normalize_key(key)
         try:
-            return super().__getitem__(key)
+            return super().__getitem__(normalized_key)
         except KeyError:
-            k = str(key).lower()
+            k = normalized_key
             
             # Route dynamic air quality / health lookups (including ozone)
             if "particle pollution" in k or "health advisory" in k or "ozone" in k:
@@ -465,7 +482,6 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "vientos, fuertes a moderados del norte": "Storms, Tornados, Floods & Winds",
     "vientos, fuertes a moderados del sur": "Storms, Tornados, Floods & Winds",
     "yellow tordenvarsel": "Storms, Tornados, Floods & Winds",
-    "yellow wind warning": "Storms, Tornados, Floods & Winds",
     "yellow torden": "Storms, Tornados, Floods & Winds",
     "*ccem - museum - threshold #2 - flooding": "Storms, Tornados, Floods & Winds",
     "stormsurge advisory clear": "Storms, Tornados, Floods & Winds",
@@ -503,6 +519,28 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "inundación": "Storms, Tornados, Floods & Winds",
     "lluvia tormenta eléctrica": "Storms, Tornados, Floods & Winds",
     "tormentas muy fuertes y severas": "Storms, Tornados, Floods & Winds",
+    "near gale 14-17 m/s": "Storms, Tornados, Floods & Winds",
+    "Disruptive Rainfall": "Storms, Tornados, Floods & Winds",
+    "Disruptive Rain": "Storms, Tornados, Floods & Winds",
+    "Lluvia": "Storms, Tornados, Floods & Winds",
+    "Severe Weather": "Storms, Tornados, Floods & Winds",
+    "Storm": "Storms, Tornados, Floods & Winds",
+    "Storms": "Storms, Tornados, Floods & Winds",
+    "Tempesta": "Storms, Tornados, Floods & Winds",
+    "Weather Advisory For Upper Parts": "Storms, Tornados, Floods & Winds",
+    "Weather Advisory For Lower Parts": "Storms, Tornados, Floods & Winds",
+    "Weather Update For Upper Parts": "Storms, Tornados, Floods & Winds",
+    "Yellow Flooding Warning": "Storms, Tornados, Floods & Winds",
+    "Yellow Flooding Alert": "Storms, Tornados, Floods & Winds",
+    "Интензивни Валежи И Гръмотевични Бури!": "Storms, Tornados, Floods & Winds",
+    "رياح قوية": "Storms, Tornados, Floods & Winds",
+    "رگبار نسبتا شدید باران، رعد و برق، وزش باد شدید موقت، در برخی نقاط گردوخاک، در نقاط مستعد بارش تگرگ": "Storms, Tornados, Floods & Winds",
+    "flash flooding": "Storms, Tornados, Floods & Winds",
+    "flood alert": "Storms, Tornados, Floods & Winds",
+    "flood situation": "Storms, Tornados, Floods & Winds",
+    "heavy rainfall warning": "Storms, Tornados, Floods & Winds",
+    "severe rainstorm warning": "Storms, Tornados, Floods & Winds",
+    "wind gust warning": "Storms, Tornados, Floods & Winds",
 
     # === TEMPERATURE EXTREMES ===
     "aviso de temperaturas máximas de nivel amarillo": "Temperature Extremes",
@@ -628,8 +666,6 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "bajas temperaturas helada": "Temperature Extremes",
     "calor": "Temperature Extremes",
     "nighttimeheat advisory": "Temperature Extremes",
-    "heat advisory": "Temperature Extremes",
-    "heat warning": "Temperature Extremes",
     "heat advisory change": "Temperature Extremes",
     "heat warning change": "Temperature Extremes",
     "silná zátěž teplem": "Temperature Extremes",
@@ -690,6 +726,15 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "snow watch": "Winter Weather",
     "nevadas fuertes": "Winter Weather",
     "heladas extremas": "Winter Weather",
+    "avalanche": "Winter Weather",
+    "avalanche advisory": "Winter Weather",
+    "avalanche warning": "Winter Weather",
+    "avalanche watch": "Winter Weather",
+    "ice storm": "Winter Weather",
+    "ice storm warning": "Winter Weather",
+    "snow squall": "Winter Weather",
+    "snow squall warning": "Winter Weather",
+    "winter storm": "Winter Weather",
 
     # === FIRE & SMOKE ===
     "awareness_type=9, awareness_level=1": "Fire & Smoke",
@@ -751,7 +796,6 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "požarna ogroženost - ekstremna ogroženost": "Fire & Smoke",
 
     # === EARTHQUAKE, TSUNAMI & VOLCANO ===
-    "avalanche": "Earthquake, Tsunami & Volcano",
     "awareness_type=10, awareness_level=1": "Earthquake, Tsunami & Volcano",
     "awareness_type=10, awareness_level=2": "Earthquake, Tsunami & Volcano",
     "awareness_type=10, awareness_level=3": "Earthquake, Tsunami & Volcano",
@@ -787,7 +831,6 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "jordskred": "Earthquake, Tsunami & Volcano",
     "landslide": "Earthquake, Tsunami & Volcano",
     "лавины": "Earthquake, Tsunami & Volcano",
-    "avalanche warning": "Earthquake, Tsunami & Volcano",
 
     # === MARINE & COASTAL ===
     "aallokkovaroitus": "Marine & Coastal",
@@ -859,6 +902,9 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "swell surge": "Marine & Coastal",
     "upepo mkali na mawimbi makubwa": "Marine & Coastal",
     "ارتفاع منسوب وسرعة جريان المياه": "Marine & Coastal",
+    "Increasing Wind Speed And Wave Height High Seas": "Marine & Coastal",
+    "Large Waves": "Marine & Coastal",
+    "Mawimbi Makubwa": "Marine & Coastal",
 
     # === AGRICULTURAL & ENVIRONMENTAL ===
     "air quality": "Agricultural & Environmental",
@@ -877,7 +923,7 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "water restrictions": "Agricultural & Environmental",
     "particle pollution": "Agricultural & Environmental",
     "health advisory": "Agricultural & Environmental",
-    "falling object": "Agricultural & Environmental",
+    "falling object": "Emergency & Civil Defense",
     "pollution de l'eau": "Agricultural & Environmental",
     "sécheresse": "Agricultural & Environmental",
     "uv advisory": "Agricultural & Environmental",
@@ -887,10 +933,11 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "baixa umidade": "Agricultural & Environmental",
     "trockenheit": "Agricultural & Environmental",
     "drinking water": "Agricultural & Environmental",
-    "air quality": "Agricultural & Environmental",
     "dusty plankton": "Agricultural & Environmental",
     "raised dust/ dust storms": "Agricultural & Environmental",
     "raised dust/dust storms": "Agricultural & Environmental",
+    "Siccità": "Agricultural & Environmental",
+    "agrometeorological disaster": "Agricultural & Environmental",
 
     # === EMERGENCY & CIVIL DEFENSE ===
     "chemical": "Emergency & Civil Defense",
@@ -957,6 +1004,9 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "indian creek set to go.": "Emergency & Civil Defense",
     "telecommunications emergency": "Emergency & Civil Defense",
     "區排警戒": "Emergency & Civil Defense",
+    "festival/fair/temple stampedes": "Emergency & Civil Defense",
+    "dangerous animals": "Emergency & Civil Defense",
+    "dangerous animal": "Emergency & Civil Defense",
 
     # === AMBER ALERTS ===
     "amber alert": "Amber Alerts",
@@ -1001,14 +1051,14 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "alarmering": "Multi-Purpose",
     "alert": "Multi-Purpose",
     "國家森林遊樂區": "Multi-Purpose",
-    "agrometeorological disaster": "Multi-Purpose",
-    "festival/fair/temple stampedes": "Multi-Purpose",
     "administrative message/follow up statement": "Multi-Purpose",
     "weather update for 24 hrs": "Multi-Purpose",
     "weather update for country": "Multi-Purpose",
     "weather update for 48 hrs": "Multi-Purpose",
     "weather update for khyber pukhtukhwa": "Multi-Purpose",
     "vigilance": "Multi-Purpose",
+    "Extremely Heavy": "Multi-Purpose",
+    "Other Non-Urgent Alerts": "Multi-Purpose",
 
     # === MISC ===
     "anderes ereignis": "Misc",
@@ -1018,6 +1068,5 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "прочие опасности": "Misc",
     "remove": "Misc",
     "brand": "Misc",
-    "dangerous animals": "Misc",
-    "dangerous animal": "Misc",
+    "Rappel Alimentaire": "Misc",
 })

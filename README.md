@@ -36,9 +36,13 @@ pip install -r requirements.txt
 python app.py
 ```
 
+- Open `http://localhost:5000/map` for the live OpenStreetMap alert view. The map refreshes automatically as the local FPAS cache updates.
+
 - Wait for the events to parse
 
 - Open the provided kml file
+
+- To choose which active alerts appear in the KML, open `http://localhost:5000/settings`, select the alerts to show, and click **Save visibility settings**.
 
 
 ## Extra setup/troubleshooting:
