@@ -14,6 +14,7 @@ import json       # Local disk alert persistence
 import re         # Detect links in alert text
 import html       # Escape popup link content safely
 import uuid
+import socket
 
 import translations
 
@@ -1188,6 +1189,14 @@ if __name__ == "__main__":
     worker.start()
     
     print("Starting KML Presenter server on local network...", flush=True)
-    print("KML URL: http://localhost:5000/alerts.kml", flush=True)
-    print("Visit http://localhost:5000/ for the page index", flush=True)
+    print("(Internal) KML URL: http://localhost:5000/alerts.kml", flush=True)
+    print("(Internal) Page Index: http://localhost:5000/", flush=True)
+    try:
+        network_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        network_socket.connect(("10.255.255.255", 1))
+        lan_ip = network_socket.getsockname()[0]
+        network_socket.close()
+        print(f"External URL: http://{lan_ip}:5000/", flush=True)
+    except OSError:
+        print("External URL: use this computer's Wi-Fi IPv4 address with port 5000", flush=True)
     app.run(host='0.0.0.0', port=5000)
