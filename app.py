@@ -1317,5 +1317,5 @@ if __name__ == "__main__":
         network_socket.close()
         print(f"External URL: http://{lan_ip}:5000/", flush=True)
     except OSError:
-        print("External URL: use this computer's Wi-Fi IPv4 address with port 5000", flush=True)
+        print("External URL: use this computer's IPv4 address with port 5000", flush=True)
     app.run(host='0.0.0.0', port=5000)
