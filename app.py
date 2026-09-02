@@ -38,6 +38,8 @@ CUSTOM_ALERTS_PATH = os.path.join(CACHE_DIR, 'custom_alerts.json')
 settings_lock = threading.Lock()
 refresh_requested = threading.Event()
 REFRESH_INTERVAL_SECONDS = 60
+sync_state_lock = threading.Lock()
+next_sync_at = time.time() + REFRESH_INTERVAL_SECONDS
 
 def load_hidden_alert_ids():
     try:
@@ -162,6 +164,8 @@ def get_web_alerts():
     alerts.extend(alert for alert in load_custom_alerts() if alert.get("enabled", True))
 
     web_alerts = []
+    with cache_lock:
+        current_new_ids = set(NEW_ALERT_IDS)
     for alert in alerts:
         polygon_color, pin_color = get_kml_color_palette(alert.get("severity", "Unknown"))
         geometries = []
@@ -198,6 +202,7 @@ def get_web_alerts():
                 if geometry.get("instruction")
             ), ""),
             "source_url": alert.get("source_url") or f"{API_BASE_URL}/alert/{alert.get('id', '')}",
+            "is_new": str(alert.get("id", "")) in current_new_ids,
             "links": [
                 link for link in get_unique_alert_links(alert)
                 if link != (alert.get("source_url") or f"{API_BASE_URL}/alert/{alert.get('id', '')}")
@@ -208,7 +213,11 @@ def get_web_alerts():
             "geometries": geometries
         })
 
-    return sorted(web_alerts, key=get_alert_start_time, reverse=True)
+    return sorted(
+        web_alerts,
+        key=lambda alert: (alert.get("is_new", False), get_alert_start_time(alert)),
+        reverse=True
+    )
 
 def load_local_disk_cache():
     """Scans files to determine the total count and renders an active progress counter in console."""
@@ -450,6 +459,9 @@ def background_alert_harvester():
     print("[Background Thread] Started alert harvester worker.", flush=True)
     while True:
         try:
+            with sync_state_lock:
+                global next_sync_at
+                next_sync_at = None
             print("\n[Background Thread] Syncing with global server...", flush=True)
             url = f"{API_BASE_URL}/alert/area?min_lat=-90&max_lat=90&min_lon=-180&max_lon=180"
             r = requests.get(url, timeout=10)
@@ -508,6 +520,8 @@ def background_alert_harvester():
         except Exception as e:
             print(f"[Background Thread] Error during harvesting: {e}", flush=True)
             
+        with sync_state_lock:
+            next_sync_at = time.time() + REFRESH_INTERVAL_SECONDS
         refresh_requested.wait(REFRESH_INTERVAL_SECONDS)
         refresh_requested.clear()
 
@@ -548,7 +562,7 @@ def serve_home():
         <div class="eyebrow">FOSSWARN / FPAS</div>
         <h1>FPAS KML</h1>
         <p class="intro">Local alert tools and feeds hosted by this server.</p>
-        <div class="refresh-bar"><button id="server-refresh" type="button">Refresh server</button><span class="refresh-timer" id="refresh-countdown">Next: 60s</span></div>
+        <div class="refresh-bar"><button id="server-refresh" type="button">Refresh server</button><span class="refresh-timer" id="refresh-countdown">Fetching time...</span></div>
         <nav class="links" aria-label="Hosted pages and feeds">
             <a href="{{ url_for('serve_map') }}"><span class="name">Live alert map</span><span class="detail">OpenStreetMap view with filters and alert details</span></a>
             <a href="{{ url_for('visibility_settings') }}"><span class="name">Alert settings</span><span class="detail">Choose visible alerts and manage custom alerts</span></a>
@@ -558,8 +572,28 @@ def serve_home():
         <footer>Map and feeds use the locally harvested FPAS alert cache.</footer>
     </main>
     <script>
-    let secondsUntilRefresh = 60;
+    let secondsUntilRefresh = 0;
     let refreshInProgress = false;
+    let syncTimeLoaded = false;
+    async function fetchInitialRefreshTime() {
+        syncTimeLoaded = false;
+        document.querySelector('#refresh-countdown').textContent = 'Fetching time...';
+        try {
+            const response = await fetch('{{ url_for('serve_sync_status') }}', { cache: 'no-store' });
+            if (!response.ok) return;
+            const data = await response.json();
+            if (data.next_sync_at === null) {
+                setTimeout(fetchInitialRefreshTime, 2000);
+                return;
+            }
+            syncTimeLoaded = true;
+            secondsUntilRefresh = data.seconds_until_sync;
+            document.querySelector('#refresh-countdown').textContent = `Next: ${secondsUntilRefresh}s`;
+        } catch (error) {
+            console.error('Unable to read sync status:', error);
+            setTimeout(fetchInitialRefreshTime, 2000);
+        }
+    }
     async function refreshServer() {
         if (refreshInProgress) return;
         refreshInProgress = true;
@@ -569,7 +603,6 @@ def serve_home():
         try {
             const response = await fetch('{{ url_for('request_server_refresh') }}', { method: 'POST' });
             if (!response.ok) throw new Error('Refresh request failed');
-            secondsUntilRefresh = 60;
         } catch (error) {
             button.textContent = 'Refresh failed';
         } finally {
@@ -579,10 +612,15 @@ def serve_home():
         }
     }
     document.querySelector('#server-refresh').addEventListener('click', refreshServer);
+    fetchInitialRefreshTime();
     setInterval(() => {
-        secondsUntilRefresh = Math.max(0, secondsUntilRefresh - 1);
-        document.querySelector('#refresh-countdown').textContent = `Next: ${secondsUntilRefresh}s`;
-        if (secondsUntilRefresh === 0) refreshServer();
+        if (!syncTimeLoaded) return;
+        if (secondsUntilRefresh > 0) {
+            secondsUntilRefresh -= 1;
+            document.querySelector('#refresh-countdown').textContent = `Next: ${secondsUntilRefresh}s`;
+        } else {
+            fetchInitialRefreshTime();
+        }
     }, 1000);
     </script>
 </body>
@@ -591,12 +629,33 @@ def serve_home():
 
 @app.route('/refresh', methods=['POST'])
 def request_server_refresh():
+    global next_sync_at
+    with sync_state_lock:
+        next_sync_at = None
     refresh_requested.set()
     return jsonify({"status": "refresh_requested"})
 
 @app.route('/alerts.json')
 def serve_alerts_json():
-    return jsonify({"alerts": get_web_alerts(), "updated": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())})
+    with sync_state_lock:
+        server_next_sync_at = next_sync_at
+    return jsonify({
+        "alerts": get_web_alerts(),
+        "updated": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "next_sync_at": server_next_sync_at
+    })
+
+@app.route('/sync-status')
+def serve_sync_status():
+    with sync_state_lock:
+        server_next_sync_at = next_sync_at
+    seconds_until_sync = None
+    if server_next_sync_at is not None:
+        seconds_until_sync = max(0, math.ceil(server_next_sync_at - time.time()))
+    return jsonify({
+        "next_sync_at": server_next_sync_at,
+        "seconds_until_sync": seconds_until_sync
+    })
 
 @app.route('/map')
 def serve_map():
@@ -635,6 +694,7 @@ def serve_map():
         .alert-row { border-left: 4px solid var(--severity); border-bottom: 1px solid var(--line); cursor: pointer; padding: 12px 10px 11px; transition: background .15s ease; }
         .alert-row:hover, .alert-row.active { background: #1b2a2d; }
         .alert-title { font-size: 14px; font-weight: 700; line-height: 1.3; }
+        .new-label { background: var(--accent); color: #0c1315; display: inline-block; font-size: 9px; font-weight: 800; letter-spacing: .1em; margin-left: 7px; padding: 2px 5px; vertical-align: 2px; }
         .alert-meta { color: var(--muted); font-size: 11px; margin-top: 5px; }
         .severity { color: var(--severity); font-size: 10px; font-weight: 700; letter-spacing: .12em; margin-top: 8px; text-transform: uppercase; }
         .empty { color: var(--muted); font-size: 13px; padding: 18px 8px; }
@@ -673,6 +733,7 @@ def serve_map():
                 <select id="severity"><option value="all">All severities</option><option value="extreme">Extreme</option><option value="severe">Severe</option><option value="moderate">Moderate</option><option value="minor">Minor</option><option value="unknown">Other</option></select>
                 <button id="refresh" type="button">Refresh now</button>
             </div>
+            <div class="refresh-timer" id="map-refresh-countdown">Next refresh: --</div>
         </section>
         <div class="stats"><span id="count">Loading alerts...</span><span id="updated"></span></div>
         <section id="alert-list" aria-live="polite"></section>
@@ -688,6 +749,8 @@ const layers = L.layerGroup().addTo(map);
 let alerts = [];
 let hasFitted = false;
 let hasLoadedAlerts = false;
+let secondsUntilMapRefresh = 0;
+let mapRefreshInProgress = false;
 
 function severityKey(value) {
     const severity = String(value || '').toLowerCase();
@@ -732,7 +795,7 @@ function render() {
     layers.clearLayers();
     const filtered = visibleAlerts();
     const list = document.querySelector('#alert-list');
-    list.innerHTML = filtered.length ? filtered.map(alert => `<article class="alert-row" data-id="${escapeHtml(alert.id)}" style="--severity:${alert.pin_color}"><div class="alert-title">${escapeHtml(alert.event_type)}</div><div class="alert-meta">${escapeHtml([...new Set(alert.geometries.map(geometry => geometry.location_name))].join(', '))}</div><div class="severity">${escapeHtml(alert.severity)}</div></article>`).join('') : '<div class="empty">No alerts match the current filters.</div>';
+    list.innerHTML = filtered.length ? filtered.map(alert => `<article class="alert-row" data-id="${escapeHtml(alert.id)}" style="--severity:${alert.pin_color}"><div class="alert-title">${escapeHtml(alert.event_type)}${alert.is_new ? '<span class="new-label">NEW</span>' : ''}</div><div class="alert-meta">${escapeHtml([...new Set(alert.geometries.map(geometry => geometry.location_name))].join(', '))}</div><div class="severity">${escapeHtml(alert.severity)}</div></article>`).join('') : '<div class="empty">No alerts match the current filters.</div>';
     const centerCounts = {};
     filtered.forEach(alert => { const key = alert.center.join(','); centerCounts[key] = (centerCounts[key] || 0) + 1; });
     const centerIndexes = {};
@@ -755,19 +818,24 @@ function render() {
     if (!hasFitted && filtered.length) { const bounds = L.latLngBounds(filtered.map(alert => alert.center)); if (bounds.isValid()) map.fitBounds(bounds.pad(.12), { maxZoom: 8 }); hasFitted = true; }
 }
 async function loadAlerts() {
+    if (mapRefreshInProgress) return;
+    mapRefreshInProgress = true;
     document.querySelector('#refresh').disabled = true;
+    document.querySelector('#map-refresh-countdown').textContent = 'Refreshing alerts...';
     try {
         const response = await fetch('/alerts.json', { cache: 'no-store' });
         if (!response.ok) throw new Error(`Feed unavailable (${response.status})`);
         const data = await response.json();
         alerts = data.alerts || [];
         hasLoadedAlerts = true;
+        secondsUntilMapRefresh = 60;
         document.querySelector('#updated').textContent = `Updated ${new Date(data.updated).toLocaleTimeString()}`;
     } catch (error) {
         console.error('Unable to fetch alert feed:', error);
         document.querySelector('#map-status').textContent = hasLoadedAlerts ? 'Refresh failed; showing previous data' : 'Alert feed unavailable';
         document.querySelector('#count').textContent = hasLoadedAlerts ? `${alerts.length} alerts shown` : 'Unable to load alerts';
         document.querySelector('#refresh').disabled = false;
+        mapRefreshInProgress = false;
         return;
     }
     try {
@@ -777,11 +845,21 @@ async function loadAlerts() {
         document.querySelector('#map-status').textContent = 'Alert data loaded; map display failed';
         document.querySelector('#count').textContent = `${alerts.length} alerts loaded`;
     }
-    finally { document.querySelector('#refresh').disabled = false; }
+    finally {
+        document.querySelector('#refresh').disabled = false;
+        mapRefreshInProgress = false;
+        document.querySelector('#map-refresh-countdown').textContent = `Next refresh: ${secondsUntilMapRefresh}s`;
+    }
 }
 document.querySelector('#search').addEventListener('input', render);
 document.querySelector('#severity').addEventListener('change', render);
 document.querySelector('#refresh').addEventListener('click', loadAlerts);
+setInterval(() => {
+    if (!hasLoadedAlerts || mapRefreshInProgress) return;
+    secondsUntilMapRefresh = Math.max(0, secondsUntilMapRefresh - 1);
+    document.querySelector('#map-refresh-countdown').textContent = `Next refresh: ${secondsUntilMapRefresh}s`;
+    if (secondsUntilMapRefresh === 0) loadAlerts();
+}, 1000);
 loadAlerts();
 </script>
 </body>
