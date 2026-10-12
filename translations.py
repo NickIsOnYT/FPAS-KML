@@ -1075,6 +1075,7 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "monthly system test": "Test & Exercise",
     "weekly eas test": "Test & Exercise",
     "system test": "Test & Exercise",
+    "Test Required Weekly Test Test": "Test & Exercise",
 
     # === Multi-Purpose ===
     "weather": "Multi-Purpose",
