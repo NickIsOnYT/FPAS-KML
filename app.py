@@ -313,6 +313,16 @@ def calculate_polygon_area(coords):
 
     return abs(area) * (6371008.8 ** 2) / 2
 
+def geometry_fingerprint(alert_id, geom):
+    return (
+        geom["type"],
+        alert_id,
+        geom.get("event_title", ""),
+        geom.get("location_name", ""),
+        tuple(tuple(coord) for coord in geom["coords"]),
+        geom.get("radius_meters") if geom["type"] == "circle" else None,
+    )
+
 def stable_kml_id(feature_type, identity):
     return f"{feature_type}_{uuid.uuid5(uuid.NAMESPACE_URL, identity).hex}"
 
@@ -1343,12 +1353,7 @@ def serve_kml():
             for geom in p["geoms"]:
                 if geom["type"] == "polygon" and len(geom["coords"]) > 1:
                     polygon_coords = tuple(tuple(coord) for coord in geom["coords"])
-                    geo_fingerprint = (
-                        p["alert_id"],
-                        geom.get("event_title", ""),
-                        geom.get("location_name", ""),
-                        polygon_coords,
-                    )
+                    geo_fingerprint = geometry_fingerprint(p["alert_id"], geom)
                     
                     if geo_fingerprint not in rendered_polygon_fingerprints:
                         shape_popup = f"""
@@ -1380,7 +1385,8 @@ def serve_kml():
                     lon_c, lat_c = geom["coords"][0]
                     radius = geom.get("radius_meters", 0.0)
                     
-                    if radius > 0:
+                    geo_fingerprint = geometry_fingerprint(p["alert_id"], geom)
+                    if radius > 0 and geo_fingerprint not in rendered_polygon_fingerprints:
                         deg_radius = radius / 111000.0 
                         circle_coords = []
                         
@@ -1413,6 +1419,7 @@ def serve_kml():
                             f"circle:{p['alert_id']}:{geom.get('event_title', '')}:"
                             f"{geom.get('location_name', '')}:{geom['coords']}:{radius}",
                         ))
+                        rendered_polygon_fingerprints.add(geo_fingerprint)
 
     # Serialize larger polygons first so contained polygons follow them.
     for target_folder, _, name, description, coords, color, identity in sorted(
@@ -1443,12 +1450,12 @@ def serve_kml():
         style_map = simplekml.StyleMap()
 
         style_map.normalstyle.iconstyle.color = lead_pin['pin_color']
-        style_map.normalstyle.iconstyle.scale = 1.6
+        style_map.normalstyle.iconstyle.scale = 1.5
         style_map.normalstyle.iconstyle.icon.href = 'http://maps.google.com/mapfiles/kml/pushpin/wht-pushpin.png'
         style_map.normalstyle.labelstyle.scale = 0.9
 
         style_map.highlightstyle.iconstyle.color = lead_pin['pin_color']
-        style_map.highlightstyle.iconstyle.scale = 2.0
+        style_map.highlightstyle.iconstyle.scale = 1.9
         style_map.highlightstyle.iconstyle.icon.href = 'http://maps.google.com/mapfiles/kml/pushpin/wht-pushpin.png'
         style_map.highlightstyle.labelstyle.scale = 1.0
 
