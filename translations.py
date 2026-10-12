@@ -544,6 +544,36 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "Pluie Orage Vent": "Storms, Tornados, Floods & Winds",
     "Severe Thunderstorms": "Storms, Tornados, Floods & Winds",
     "فيضان مفاجئ": "Storms, Tornados, Floods & Winds",
+    "light fog": "Storms, Tornados, Floods & Winds",
+    "moderate fog": "Storms, Tornados, Floods & Winds",
+    "dense fog": "Storms, Tornados, Floods & Winds",
+    "Brume-Seche": "Storms, Tornados, Floods & Winds",
+    "dry haze": "Storms, Tornados, Floods & Winds",
+    "dry-haze": "Storms, Tornados, Floods & Winds",
+    "haze": "Storms, Tornados, Floods & Winds",
+    "smog": "Storms, Tornados, Floods & Winds",
+    "Aguaceros Y Tormentas Dispersas Est": "Storms, Tornados, Floods & Winds",
+    "Scattered Showers and Thunderstorms": "Storms, Tornados, Floods & Winds",
+    "Tuulivaroitus Maa-Alueille": "Storms, Tornados, Floods & Winds",
+    "Vindvarning För Landområden": "Storms, Tornados, Floods & Winds",
+    "Lluvia, Granizo Y Tormentas Electricas Tormenta Eléctrica": "Storms, Tornados, Floods & Winds",
+    "Moderate Rain Warning": "Storms, Tornados, Floods & Winds",
+    "Moderate Rain Alert": "Storms, Tornados, Floods & Winds",
+    "Onde De Tempête": "Storms, Tornados, Floods & Winds",
+    "Orange Warning": "Storms, Tornados, Floods & Winds",
+    "Orange Alert": "Storms, Tornados, Floods & Winds",
+    "Rūkas": "Storms, Tornados, Floods & Winds",
+    "Severe Rain Warning": "Storms, Tornados, Floods & Winds",
+    "Severe Rain Alert": "Storms, Tornados, Floods & Winds",
+    "Tempête De Poussière/Tempête De Sable": "Storms, Tornados, Floods & Winds",
+    "Vindkastvarning": "Storms, Tornados, Floods & Winds",
+    "Vindkast": "Storms, Tornados, Floods & Winds",
+    "Visibility Warning": "Storms, Tornados, Floods & Winds",
+    "Visibility Alert": "Storms, Tornados, Floods & Winds",
+    "Wind In The Alpine Region": "Storms, Tornados, Floods & Winds",
+    "Yellow Wind": "Storms, Tornados, Floods & Winds",
+    "Значителни Валежи И Силен Вятър!": "Storms, Tornados, Floods & Winds",
+    "Значителни Валежи!": "Storms, Tornados, Floods & Winds",
 
     # === TEMPERATURE EXTREMES ===
     "aviso de temperaturas máximas de nivel amarillo": "Temperature Extremes",
@@ -685,6 +715,7 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "rising temperatures": "Temperature Extremes",
     "ارتفاع درجات الحرارة": "Temperature Extremes",
     "حرارة": "Temperature Extremes",
+    "hot spell": "Temperature Extremes",
 
     # === WINTER WEATHER ===
     "awareness_type=6, awareness_level=1": "Winter Weather",
@@ -738,6 +769,20 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "snow squall": "Winter Weather",
     "snow squall warning": "Winter Weather",
     "winter storm": "Winter Weather",
+    "ice": "Winter Weather",
+    "Is": "Winter Weather",
+    "icing": "Winter Weather",
+    "Ising": "Winter Weather",
+    "ground frost warning": "Winter Weather",
+    "ground frost watch": "Winter Weather",
+    "freeze warning": "Winter Weather",
+    "freeze watch": "Winter Weather",
+    "freeze advisory": "Winter Weather",
+    "Road Ice And Snow": "Winter Weather",
+    "Snowfall": "Winter Weather",
+    "Veðurviðvörun: Hríð": "Winter Weather",
+    "Veðurviðvörun: Snjókoma": "Winter Weather",
+    "Гололедно - Изморозевое Отложение": "Winter Weather",
 
     # === FIRE & SMOKE ===
     "awareness_type=9, awareness_level=1": "Fire & Smoke",
@@ -941,6 +986,7 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "raised dust/dust storms": "Agricultural & Environmental",
     "Siccità": "Agricultural & Environmental",
     "agrometeorological disaster": "Agricultural & Environmental",
+    "Seca/Período De Seca": "Agricultural & Environmental",
 
     # === EMERGENCY & CIVIL DEFENSE ===
     "chemical": "Emergency & Civil Defense",
@@ -1010,6 +1056,7 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "festival/fair/temple stampedes": "Emergency & Civil Defense",
     "dangerous animals": "Emergency & Civil Defense",
     "dangerous animal": "Emergency & Civil Defense",
+    "تلوث بمخلفات الحرب": "Emergency & Civil Defense", #WHAT
 
     # === AMBER ALERTS ===
     "amber alert": "Amber Alerts",
@@ -1062,6 +1109,12 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "vigilance": "Multi-Purpose",
     "Extremely Heavy": "Multi-Purpose",
     "Other Non-Urgent Alerts": "Multi-Purpose",
+    "exposure": "Multi-Purpose",
+    "Traffic Weather Warning": "Multi-Purpose",
+    "Liikennesää": "Multi-Purpose",
+    "Trafikvädret": "Multi-Purpose",
+    "traffic weather": "Multi-Purpose",
+    "Press Release": "Multi-Purpose",
 
     # === MISC ===
     "anderes ereignis": "Misc",

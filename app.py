@@ -296,6 +296,26 @@ def calculate_centroid_from_geometries(geometries):
     avg_lat = sum(c[1] for c in unique_coords) / len(unique_coords)
     return (avg_lon, avg_lat)
 
+def calculate_polygon_area(coords):
+    if len(coords) < 3:
+        return 0.0
+
+    area = 0.0
+    for index, (lon1, lat1) in enumerate(coords):
+        lon2, lat2 = coords[(index + 1) % len(coords)]
+        lon1, lat1, lon2, lat2 = map(math.radians, (lon1, lat1, lon2, lat2))
+        delta_lon = lon2 - lon1
+        if delta_lon > math.pi:
+            delta_lon -= 2 * math.pi
+        elif delta_lon < -math.pi:
+            delta_lon += 2 * math.pi
+        area += delta_lon * (2 + math.sin(lat1) + math.sin(lat2))
+
+    return abs(area) * (6371008.8 ** 2) / 2
+
+def stable_kml_id(feature_type, identity):
+    return f"{feature_type}_{uuid.uuid5(uuid.NAMESPACE_URL, identity).hex}"
+
 def format_cap_timestamp(ts_str):
     if not ts_str:
         return "N/A"
@@ -1166,6 +1186,7 @@ def serve_kml():
                     geolocated_pin_buckets[coord_bucket] = []
                     
                 geolocated_pin_buckets[coord_bucket].append({
+                    "alert_id": str(item["id"]),
                     "category": category_name,
                     "subcategory": target_subcategory_string,
                     "is_new": is_new_alert,
@@ -1214,6 +1235,13 @@ def serve_kml():
             subcategory_folders[sub_folder_key] = sub_folder_obj
             folder_region_trackers[sub_folder_obj] = set()
 
+    polygons_folder = kml.newfolder(name="Polygons")
+    polygon_new_alerts_folder = None
+    polygon_category_folders = {}
+    polygon_subfolders = {}
+    pending_polygons = []
+    pending_pins = []
+    stable_placemark_ids = {}
     for coord_bucket, stacked_pins in geolocated_pin_buckets.items():
         lead_pin = stacked_pins[0]
         
@@ -1228,10 +1256,37 @@ def serve_kml():
         else:
             target_folder = subcategory_folders[(lead_pin["category"], lead_pin["subcategory"])]
 
+        if lead_pin["is_new"]:
+            polygon_subcategory_key = lead_pin["subcategory"]
+            if polygon_subcategory_key not in polygon_subfolders:
+                if polygon_new_alerts_folder is None:
+                    polygon_new_alerts_folder = polygons_folder.newfolder(name="New Alerts")
+                    folder_region_trackers[polygon_new_alerts_folder] = set()
+                polygon_subfolders[polygon_subcategory_key] = polygon_new_alerts_folder.newfolder(
+                    name=lead_pin["subcategory"]
+                )
+                folder_region_trackers[polygon_subfolders[polygon_subcategory_key]] = set()
+            polygon_target_folder = polygon_subfolders[polygon_subcategory_key]
+        else:
+            polygon_category_key = lead_pin["category"]
+            if polygon_category_key not in polygon_category_folders:
+                polygon_category_folders[polygon_category_key] = polygons_folder.newfolder(
+                    name=lead_pin["category"]
+                )
+                folder_region_trackers[polygon_category_folders[polygon_category_key]] = set()
+            polygon_subcategory_key = (lead_pin["category"], lead_pin["subcategory"])
+            if polygon_subcategory_key not in polygon_subfolders:
+                polygon_subfolders[polygon_subcategory_key] = polygon_category_folders[
+                    polygon_category_key
+                ].newfolder(name=lead_pin["subcategory"])
+                folder_region_trackers[polygon_subfolders[polygon_subcategory_key]] = set()
+            polygon_target_folder = polygon_subfolders[polygon_subcategory_key]
+
         # Collect regions into the parent subfolder's tracker
         for p in stacked_pins:
             if p.get("loc_name"):
                 folder_region_trackers[target_folder].add(p["loc_name"])
+                folder_region_trackers[polygon_target_folder].add(p["loc_name"])
 
         if len(stacked_pins) > 1:
             consolidated_title = f"{lead_pin['subcategory']} ({len(stacked_pins)})"
@@ -1281,29 +1336,19 @@ def serve_kml():
             </div>
             """
 
-        # Point Pin Definition
-        pin = target_folder.newpoint(name=consolidated_title, coords=[(lead_pin['raw_lon'], lead_pin['raw_lat'])])
-        pin.description = popup_content
-        
-        # StyleMap setup for pins
-        style_map = simplekml.StyleMap()
-        
-        style_map.normalstyle.iconstyle.color = lead_pin['pin_color']
-        style_map.normalstyle.iconstyle.scale = 1.2
-        style_map.normalstyle.iconstyle.icon.href = 'http://maps.google.com/mapfiles/kml/pushpin/wht-pushpin.png'
-        style_map.normalstyle.labelstyle.scale = 0.9
-        
-        style_map.highlightstyle.iconstyle.color = lead_pin['pin_color']
-        style_map.highlightstyle.iconstyle.scale = 1.7
-        style_map.highlightstyle.iconstyle.icon.href = 'http://maps.google.com/mapfiles/kml/pushpin/wht-pushpin.png'
-        style_map.highlightstyle.labelstyle.scale = 1.0
-        
-        pin.stylemap = style_map
+        pin_identity = ",".join(sorted({p["alert_id"] for p in stacked_pins}))
+        pending_pins.append((target_folder, consolidated_title, popup_content, lead_pin, pin_identity))
 
         for p in stacked_pins:
             for geom in p["geoms"]:
                 if geom["type"] == "polygon" and len(geom["coords"]) > 1:
-                    geo_fingerprint = f"{geom['coords'][0][0]},{geom['coords'][0][1]}_{geom['coords'][-1][0]}_{geom['coords'][-1][1]}_{len(geom['coords'])}"
+                    polygon_coords = tuple(tuple(coord) for coord in geom["coords"])
+                    geo_fingerprint = (
+                        p["alert_id"],
+                        geom.get("event_title", ""),
+                        geom.get("location_name", ""),
+                        polygon_coords,
+                    )
                     
                     if geo_fingerprint not in rendered_polygon_fingerprints:
                         shape_popup = f"""
@@ -1319,12 +1364,16 @@ def serve_kml():
                         </div>
                         """
                         
-                        pol = target_folder.newpolygon(name=geom['event_title'].title(), outerboundaryis=geom["coords"])
-                        pol.description = shape_popup
-                        pol.style.polystyle.color = p['poly_color']
-                        pol.style.linestyle.color = p['poly_color']
-                        pol.style.linestyle.width = 3.0
-                        
+                        pending_polygons.append((
+                            polygon_target_folder,
+                            calculate_polygon_area(geom["coords"]),
+                            geom['event_title'].title(),
+                            shape_popup,
+                            geom["coords"],
+                            p['poly_color'],
+                            f"polygon:{p['alert_id']}:{geom.get('event_title', '')}:"
+                            f"{geom.get('location_name', '')}:{polygon_coords}",
+                        ))
                         rendered_polygon_fingerprints.add(geo_fingerprint)
                         
                 elif geom["type"] == "circle":
@@ -1354,11 +1403,56 @@ def serve_kml():
                         </div>
                         """
                         
-                        pol = target_folder.newpolygon(name=geom['event_title'].title(), outerboundaryis=circle_coords)
-                        pol.description = shape_popup
-                        pol.style.polystyle.color = p['poly_color']
-                        pol.style.linestyle.color = p['poly_color']
-                        pol.style.linestyle.width = 3.0
+                        pending_polygons.append((
+                            polygon_target_folder,
+                            calculate_polygon_area(circle_coords),
+                            geom['event_title'].title(),
+                            shape_popup,
+                            circle_coords,
+                            p['poly_color'],
+                            f"circle:{p['alert_id']}:{geom.get('event_title', '')}:"
+                            f"{geom.get('location_name', '')}:{geom['coords']}:{radius}",
+                        ))
+
+    # Serialize larger polygons first so contained polygons follow them.
+    for target_folder, _, name, description, coords, color, identity in sorted(
+        pending_polygons,
+        key=lambda polygon: polygon[1],
+        reverse=True
+    ):
+        pol = target_folder.newpolygon(name=name, outerboundaryis=coords)
+        stable_placemark_ids[pol.id] = stable_kml_id("polygon", identity)
+        pol.description = description
+        pol.style.polystyle.color = color
+        pol.style.linestyle.color = color
+        pol.style.linestyle.width = 3.0
+
+    for target_folder, pin_title, popup_content, lead_pin, pin_identity in pending_pins:
+        pin = target_folder.newpoint(
+            name=pin_title,
+            coords=[(lead_pin['raw_lon'], lead_pin['raw_lat'], 10)]
+        )
+        stable_placemark_ids[pin.id] = stable_kml_id(
+            "pin",
+            f"{pin_identity}:{lead_pin['raw_lon']:.5f}:{lead_pin['raw_lat']:.5f}",
+        )
+        pin.visibility = 1
+        pin.altitudemode = simplekml.AltitudeMode.relativetoground
+        pin.description = popup_content
+
+        style_map = simplekml.StyleMap()
+
+        style_map.normalstyle.iconstyle.color = lead_pin['pin_color']
+        style_map.normalstyle.iconstyle.scale = 1.6
+        style_map.normalstyle.iconstyle.icon.href = 'http://maps.google.com/mapfiles/kml/pushpin/wht-pushpin.png'
+        style_map.normalstyle.labelstyle.scale = 0.9
+
+        style_map.highlightstyle.iconstyle.color = lead_pin['pin_color']
+        style_map.highlightstyle.iconstyle.scale = 2.0
+        style_map.highlightstyle.iconstyle.icon.href = 'http://maps.google.com/mapfiles/kml/pushpin/wht-pushpin.png'
+        style_map.highlightstyle.labelstyle.scale = 1.0
+
+        pin.stylemap = style_map
 
     # Populate descriptions for all active subfolders listing affected regions on a single line
     for folder_obj, regions_set in folder_region_trackers.items():
@@ -1368,6 +1462,16 @@ def serve_kml():
             folder_obj.description = f"Regions: {horizontal_region_str}"
 
     output_kml_data = kml.kml()
+    output_kml_data = re.sub(
+        r'(<Placemark\b[^>]*\bid=")([^"]+)(")',
+        lambda match: (
+            f"{match.group(1)}"
+            f"{stable_placemark_ids.get(match.group(2), match.group(2))}"
+            f"{match.group(3)}"
+        ),
+        output_kml_data,
+    )
+    del stable_placemark_ids
     
     del kml
     del category_folders
@@ -1375,6 +1479,8 @@ def serve_kml():
     del new_subfolders
     del folder_region_trackers
     del geolocated_pin_buckets
+    del pending_pins
+    del pending_polygons
     gc.collect()  
     
     return Response(output_kml_data, mimetype='application/vnd.google-earth.kml+xml')
