@@ -555,6 +555,7 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "Yellow Wind": "Storms, Tornados, Floods & Winds",
     "Значителни Валежи И Силен Вятър!": "Storms, Tornados, Floods & Winds",
     "Значителни Валежи!": "Storms, Tornados, Floods & Winds",
+    "Lluvias, Tormentas Eléctricas Y Vientos": "Storms, Tornados, Floods & Winds",
 
     # === TEMPERATURE EXTREMES ===
     "aviso de temperaturas máximas de nivel amarillo": "Temperature Extremes",
