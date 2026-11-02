@@ -136,7 +136,10 @@ def get_alert_display_name(alert):
 def get_alert_start_time(alert):
     value = str(alert.get("raw_effective") or alert.get("effective") or "")
     try:
-        return datetime.fromisoformat(value.replace("Z", "+00:00")).replace(tzinfo=timezone.utc) if "+" not in value else datetime.fromisoformat(value)
+        parsed_time = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if parsed_time.tzinfo is None:
+            return parsed_time.replace(tzinfo=timezone.utc)
+        return parsed_time.astimezone(timezone.utc)
     except ValueError:
         return datetime.min.replace(tzinfo=timezone.utc)
 
@@ -181,11 +184,7 @@ def get_web_alerts():
                 "location_name": geometry.get("location_name", "Unknown Location")
             })
 
-        if all_coordinates:
-            center_lon = sum(coord[0] for coord in all_coordinates) / len(all_coordinates)
-            center_lat = sum(coord[1] for coord in all_coordinates) / len(all_coordinates)
-        else:
-            center_lon, center_lat = 0, 0
+        center_lon, center_lat = calculate_coordinate_centroid(all_coordinates)
 
         web_alerts.append({
             "id": str(alert.get("id", "")),
@@ -284,17 +283,25 @@ def kml_color_to_hex(kml_color_str):
         return f"{r}{g}{b}"
     return "333333"
 
+def calculate_coordinate_centroid(coordinates):
+    if not coordinates:
+        return (0.0, 0.0)
+
+    longitude_sin = sum(math.sin(math.radians(coord[0])) for coord in coordinates)
+    longitude_cos = sum(math.cos(math.radians(coord[0])) for coord in coordinates)
+    if math.isclose(longitude_sin, 0.0, abs_tol=1e-12) and math.isclose(longitude_cos, 0.0, abs_tol=1e-12):
+        longitude = sum(coord[0] for coord in coordinates) / len(coordinates)
+    else:
+        longitude = math.degrees(math.atan2(longitude_sin, longitude_cos))
+    latitude = sum(coord[1] for coord in coordinates) / len(coordinates)
+    return (longitude, latitude)
+
 def calculate_centroid_from_geometries(geometries):
     all_coords = []
     for geom in geometries:
         all_coords.extend(geom["coords"])
-    if not all_coords:
-        return (0.0, 0.0)
-    
-    unique_coords = list(set(tuple(c) for c in all_coords))
-    avg_lon = sum(c[0] for c in unique_coords) / len(unique_coords)
-    avg_lat = sum(c[1] for c in unique_coords) / len(unique_coords)
-    return (avg_lon, avg_lat)
+    unique_coords = list(set(tuple(coord) for coord in all_coords))
+    return calculate_coordinate_centroid(unique_coords)
 
 def calculate_polygon_area(coords):
     if len(coords) < 3:
@@ -1192,10 +1199,16 @@ def serve_kml():
                     else:
                         category_name = "Uncategorized Alerts"
                 
-                if coord_bucket not in geolocated_pin_buckets:
-                    geolocated_pin_buckets[coord_bucket] = []
+                bucket_key = (
+                    coord_bucket,
+                    category_name,
+                    target_subcategory_string,
+                    is_new_alert,
+                )
+                if bucket_key not in geolocated_pin_buckets:
+                    geolocated_pin_buckets[bucket_key] = []
                     
-                geolocated_pin_buckets[coord_bucket].append({
+                geolocated_pin_buckets[bucket_key].append({
                     "alert_id": str(item["id"]),
                     "category": category_name,
                     "subcategory": target_subcategory_string,
@@ -1215,7 +1228,7 @@ def serve_kml():
                     "geoms": pin_data["geoms"]
                 })
 
-    for coord_bucket, stacked_pins in geolocated_pin_buckets.items():
+    for stacked_pins in geolocated_pin_buckets.values():
         lead_pin = stacked_pins[0]
         if not lead_pin["is_new"]:
             c_name = lead_pin["category"]
@@ -1252,7 +1265,7 @@ def serve_kml():
     pending_polygons = []
     pending_pins = []
     stable_placemark_ids = {}
-    for coord_bucket, stacked_pins in geolocated_pin_buckets.items():
+    for stacked_pins in geolocated_pin_buckets.values():
         lead_pin = stacked_pins[0]
         
         # Determine target folder hierarchy
