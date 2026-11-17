@@ -606,6 +606,8 @@ CATEGORY_MAPPING = SmartCategoryMapping({
     "أمطار متواصلة": "Storms, Tornados, Floods & Winds",
     "أمطار متواصلة غزيرة": "Storms, Tornados, Floods & Winds",
     "عواصف إعصارية": "Storms, Tornados, Floods & Winds",
+    "Hurricane Force Wind Warning": "Storms, Tornados, Floods & Winds",
+    "Prob. Nubes Convectivas Tornádicas": "Storms, Tornados, Floods & Winds",
 
     # === TEMPERATURE EXTREMES ===
     "aviso de temperaturas máximas de nivel amarillo": "Temperature Extremes",
