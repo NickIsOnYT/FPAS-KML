@@ -38,23 +38,40 @@ CUSTOM_ALERTS_PATH = os.path.join(CACHE_DIR, 'custom_alerts.json')
 settings_lock = threading.Lock()
 refresh_requested = threading.Event()
 REFRESH_INTERVAL_SECONDS = 60
+MAX_CAP_XML_UPLOAD_BYTES = 5 * 1024 * 1024
 sync_state_lock = threading.Lock()
 next_sync_at = time.time() + REFRESH_INTERVAL_SECONDS
 
 def load_hidden_alert_ids():
+    settings = load_visibility_settings()
+    hidden_ids = settings.get("hidden_alert_ids", [])
+    return {str(alert_id) for alert_id in hidden_ids}
+
+def load_visibility_settings():
     try:
         with open(VISIBILITY_SETTINGS_PATH, "r", encoding="utf-8") as f:
             data = json.load(f)
-        hidden_ids = data.get("hidden_alert_ids", [])
-        return {str(alert_id) for alert_id in hidden_ids}
+        return data if isinstance(data, dict) else {}
     except (FileNotFoundError, json.JSONDecodeError, OSError, AttributeError):
-        return set()
+        return {}
 
 def save_hidden_alert_ids(hidden_ids):
+    update_visibility_settings(hidden_alert_ids=sorted(hidden_ids))
+
+def load_show_all_custom_alerts():
+    value = load_visibility_settings().get("show_all_custom_alerts", True)
+    return value if isinstance(value, bool) else True
+
+def save_show_all_custom_alerts(show_all):
+    update_visibility_settings(show_all_custom_alerts=bool(show_all))
+
+def update_visibility_settings(**updates):
     temporary_path = f"{VISIBILITY_SETTINGS_PATH}.tmp"
     with settings_lock:
+        settings = load_visibility_settings()
+        settings.update(updates)
         with open(temporary_path, "w", encoding="utf-8") as f:
-            json.dump({"hidden_alert_ids": sorted(hidden_ids)}, f, indent=2)
+            json.dump(settings, f, indent=2)
         os.replace(temporary_path, VISIBILITY_SETTINGS_PATH)
 
 def load_custom_alerts():
@@ -115,12 +132,159 @@ def build_custom_alert(form):
         "severity": form.get("custom_severity", "Unknown").strip() or "Unknown",
         "raw_effective": start,
         "effective": start,
+        "raw_expires": end,
         "expires": end,
         "source_url": source_url,
         "custom": True,
         "enabled": True,
         "geometries": [geometry]
     }
+
+def parse_cap_alert_xml(xml_content):
+    try:
+        root = ET.fromstring(xml_content)
+    except ET.ParseError as error:
+        raise ValueError("The uploaded file is not valid XML.") from error
+
+    if root.tag.rsplit("}", 1)[-1] != "alert":
+        raise ValueError("The uploaded XML must be a CAP alert.")
+
+    identifier = (root.findtext('{*}identifier') or "").strip()
+    if not identifier:
+        raise ValueError("The CAP alert is missing its identifier.")
+
+    info_main = root.find('.//{*}info')
+    if info_main is None:
+        raise ValueError("The CAP alert does not contain any info.")
+
+    event = (info_main.findtext('{*}event') or "Alert").strip()
+    severity = (info_main.findtext('{*}severity') or "Unknown").strip()
+    raw_effective = (
+        info_main.findtext('{*}effective')
+        or root.findtext('{*}sent')
+        or ""
+    ).strip()
+    raw_expires = (info_main.findtext('{*}expires') or "").strip()
+    effective_time = format_cap_timestamp(raw_effective)
+    expires_time = format_cap_timestamp(raw_expires)
+
+    geometries = []
+    for info_block in root.findall('.//{*}info'):
+        lang = info_block.findtext('{*}language', 'en-CA')
+        local_event = info_block.findtext('{*}event', event)
+        base_description = (info_block.findtext('{*}description') or "No description.").strip()
+        local_instruction = (info_block.findtext('{*}instruction') or "").strip()
+
+        info_links = []
+        for link_field in ['web', 'contact']:
+            link_value = (info_block.findtext(f'{{*}}{link_field}') or '').strip()
+            for display_text, full_url in extract_links_from_text(link_value):
+                if full_url not in {url for _, url in info_links}:
+                    info_links.append((display_text, full_url))
+
+        for resource in info_block.findall('{*}resource'):
+            uri_value = (resource.findtext('{*}uri') or '').strip()
+            for display_text, full_url in extract_links_from_text(uri_value):
+                if full_url not in {url for _, url in info_links}:
+                    info_links.append((display_text, full_url))
+
+        cmam_long, cmam_short = None, None
+        for param in info_block.findall('{*}parameter'):
+            value_name = (param.findtext('{*}valueName') or '').strip()
+            value = (param.findtext('{*}value') or '').strip()
+            if value_name == 'CMAMlongtext':
+                cmam_long = value
+            elif value_name == 'CMAMtext':
+                cmam_short = value
+        local_description = cmam_long or cmam_short or base_description
+
+        for area in info_block.findall('{*}area'):
+            area_desc = area.findtext('{*}areaDesc', 'Unknown Location')
+
+            for polygon_node in area.findall('{*}polygon'):
+                if not polygon_node.text:
+                    continue
+                polygon_coords = []
+                for pair in polygon_node.text.split():
+                    parts = pair.split(',')
+                    if len(parts) != 2:
+                        raise ValueError("The CAP alert contains invalid polygon coordinates.")
+                    try:
+                        latitude, longitude = map(float, parts)
+                    except ValueError as error:
+                        raise ValueError("The CAP alert contains invalid polygon coordinates.") from error
+                    if not -90 <= latitude <= 90 or not -180 <= longitude <= 180:
+                        raise ValueError("The CAP alert contains coordinates outside valid ranges.")
+                    polygon_coords.append((longitude, latitude))
+                if len(polygon_coords) < 3:
+                    raise ValueError("A CAP polygon needs at least three coordinate pairs.")
+                geometries.append({
+                    "type": "polygon",
+                    "language": lang,
+                    "event_title": local_event,
+                    "location_name": area_desc,
+                    "description": local_description,
+                    "instruction": local_instruction,
+                    "links": info_links,
+                    "coords": polygon_coords
+                })
+
+            for circle_node in area.findall('{*}circle'):
+                if not circle_node.text:
+                    continue
+                parts = circle_node.text.strip().split()
+                if len(parts) < 2:
+                    raise ValueError("The CAP alert contains an invalid circle.")
+                coordinate_parts = parts[0].split(',')
+                if len(coordinate_parts) != 2:
+                    raise ValueError("The CAP alert contains an invalid circle.")
+                try:
+                    latitude, longitude = map(float, coordinate_parts)
+                    radius_meters = float(parts[1])
+                except ValueError as error:
+                    raise ValueError("The CAP alert contains an invalid circle.") from error
+                if (
+                    not -90 <= latitude <= 90
+                    or not -180 <= longitude <= 180
+                    or radius_meters < 0
+                ):
+                    raise ValueError("The CAP alert contains a circle outside valid ranges.")
+                geometries.append({
+                    "type": "circle",
+                    "language": lang,
+                    "event_title": local_event,
+                    "location_name": area_desc,
+                    "description": local_description,
+                    "instruction": local_instruction,
+                    "links": info_links,
+                    "coords": [(longitude, latitude)],
+                    "radius_meters": radius_meters
+                })
+
+    if not geometries:
+        raise ValueError("The CAP alert does not contain any mappable polygons or circles.")
+
+    return {
+        "id": identifier,
+        "event_type": event,
+        "severity": severity,
+        "raw_effective": raw_effective or "0000-00-00",
+        "effective": effective_time,
+        "raw_expires": raw_expires,
+        "expires": expires_time,
+        "geometries": geometries
+    }
+
+def build_uploaded_cap_alert(xml_content):
+    alert = parse_cap_alert_xml(xml_content)
+    cap_identifier = alert["id"]
+    alert.update({
+        "id": f"custom-{uuid.uuid4().hex}",
+        "source_url": f"{API_BASE_URL}/alert/{cap_identifier}",
+        "custom": True,
+        "enabled": True,
+    })
+    return alert
 
 def get_alert_display_name(alert):
     event_name = str(alert.get("event_type", "Alert")).strip() or "Alert"
@@ -143,6 +307,40 @@ def get_alert_start_time(alert):
     except ValueError:
         return datetime.min.replace(tzinfo=timezone.utc)
 
+def custom_alert_is_within_time_window(alert, now):
+    def parse_time(value):
+        if not value or str(value).strip().upper() == "N/A":
+            return None
+        try:
+            parsed_time = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        if parsed_time.tzinfo is None:
+            return parsed_time.replace(tzinfo=timezone.utc)
+        return parsed_time.astimezone(timezone.utc)
+
+    start = parse_time(alert.get("raw_effective") or alert.get("effective"))
+    end = parse_time(alert.get("raw_expires") or alert.get("expires"))
+    return (start is None or now >= start) and (end is None or now <= end)
+
+def get_visible_custom_alerts(now=None):
+    custom_alerts = [
+        alert for alert in load_custom_alerts()
+        if alert.get("enabled", True)
+    ]
+    if load_show_all_custom_alerts():
+        return custom_alerts
+
+    current_time = now or datetime.now(timezone.utc)
+    if current_time.tzinfo is None:
+        current_time = current_time.replace(tzinfo=timezone.utc)
+    else:
+        current_time = current_time.astimezone(timezone.utc)
+    return [
+        alert for alert in custom_alerts
+        if custom_alert_is_within_time_window(alert, current_time)
+    ]
+
 def get_unique_alert_links(alert):
     links = []
     seen_urls = set()
@@ -164,7 +362,7 @@ def get_web_alerts():
             alert for alert_id, alert in ALERT_CACHE.items()
             if str(alert_id) not in hidden_ids
         ]
-    alerts.extend(alert for alert in load_custom_alerts() if alert.get("enabled", True))
+    alerts.extend(get_visible_custom_alerts())
 
     web_alerts = []
     with cache_lock:
@@ -320,6 +518,32 @@ def calculate_polygon_area(coords):
 
     return abs(area) * (6371008.8 ** 2) / 2
 
+def calculate_geometry_view_range(geometries, center_lon, center_lat):
+    max_distance = 0.0
+    center_lat_rad = math.radians(center_lat)
+    earth_radius_meters = 6371008.8
+
+    for geometry in geometries:
+        geometry_max_distance = 0.0
+        for longitude, latitude in geometry.get("coords", []):
+            latitude_rad = math.radians(latitude)
+            delta_lat = latitude_rad - center_lat_rad
+            delta_lon = math.radians((longitude - center_lon + 180) % 360 - 180)
+            haversine = (
+                math.sin(delta_lat / 2) ** 2
+                + math.cos(center_lat_rad) * math.cos(latitude_rad)
+                * math.sin(delta_lon / 2) ** 2
+            )
+            distance = 2 * earth_radius_meters * math.asin(math.sqrt(min(1.0, haversine)))
+            geometry_max_distance = max(geometry_max_distance, distance)
+
+        if geometry.get("type") == "circle":
+            geometry_max_distance += geometry.get("radius_meters", 0.0)
+        max_distance = max(max_distance, geometry_max_distance)
+
+    # Leave enough camera range to show the full extent with a small margin.
+    return max_distance * 2.5
+
 def geometry_fingerprint(alert_id, geom):
     return (
         geom["type"],
@@ -392,104 +616,15 @@ def build_sources_html(title, cap_url, body_text, extra_links=None):
 def fetch_single_alert(alert_id):
     try:
         r = requests.get(f"{API_BASE_URL}/alert/{alert_id}", timeout=5)
-        if r.status_code != 200: return alert_id, None
-        
-        root = ET.fromstring(r.content)
-        info_main = root.find('.//{*}info')
-        if info_main is None: return alert_id, None
+        if r.status_code != 200:
+            return alert_id, None
 
-        event = info_main.findtext('{*}event', 'Alert')
-        severity = info_main.findtext('{*}severity', 'Unknown')
-        
-        raw_effective = info_main.findtext('{*}effective', '')
-        effective_time = format_cap_timestamp(raw_effective)
-        expires_time = format_cap_timestamp(info_main.findtext('{*}expires', ''))
-        
-        geometries = []
-        
-        for info_block in root.findall('.//{*}info'):
-            lang = info_block.findtext('{*}language', 'en-CA')
-            local_event = info_block.findtext('{*}event', event)
-            base_description = info_block.findtext('{*}description', 'No description.').strip()
-            local_instruction = info_block.findtext('{*}instruction', '').strip()
-
-            info_links = []
-            for link_field in ['web', 'contact']:
-                link_value = info_block.findtext(f'{{*}}{link_field}', '').strip()
-                for display_text, full_url in extract_links_from_text(link_value):
-                    if full_url not in {u for _, u in info_links}:
-                        info_links.append((display_text, full_url))
-
-            for resource in info_block.findall('{*}resource'):
-                uri_value = resource.findtext('{*}uri', '').strip()
-                for display_text, full_url in extract_links_from_text(uri_value):
-                    if full_url not in {u for _, u in info_links}:
-                        info_links.append((display_text, full_url))
-            
-            cmam_long, cmam_short = None, None
-            for param in info_block.findall('{*}parameter'):
-                v_name = param.findtext('{*}valueName', '').strip()
-                v_val = param.findtext('{*}value', '').strip()
-                if v_name == 'CMAMlongtext': cmam_long = v_val
-                elif v_name == 'CMAMtext': cmam_short = v_val
-            
-            local_description = cmam_long or cmam_short or base_description
-            
-            for area in info_block.findall('{*}area'):
-                area_desc = area.findtext('{*}areaDesc', 'Unknown Location')
-                
-                for poly_node in area.findall('{*}polygon'):
-                    if poly_node.text:
-                        current_poly_coords = []
-                        for pair in poly_node.text.split(): 
-                            if ',' in pair:
-                                lat, lon = pair.split(',')
-                                current_poly_coords.append((float(lon), float(lat)))
-                        if current_poly_coords:
-                            geometries.append({
-                                "type": "polygon",
-                                "language": lang,
-                                "event_title": local_event,
-                                "location_name": area_desc,
-                                "description": local_description,
-                                "instruction": local_instruction,
-                                "links": info_links,
-                                "coords": current_poly_coords
-                            })
-                
-                for circle_node in area.findall('{*}circle'):
-                    if circle_node.text:
-                        parts = circle_node.text.strip().split()
-                        if parts and ',' in parts[0]:
-                            lat, lon = parts[0].split(',')
-                            try:
-                                geometries.append({
-                                    "type": "circle",
-                                    "language": lang,
-                                    "event_title": local_event,
-                                    "location_name": area_desc,
-                                    "description": local_description,
-                                    "instruction": local_instruction,
-                                    "links": info_links,
-                                    "coords": [(float(lon), float(lat))],
-                                    "radius_meters": float(parts[1]) if len(parts) > 1 else 0.0
-                                })
-                            except ValueError:
-                                pass
-        
-        if geometries:
-            return alert_id, {
-                "id": alert_id,
-                "event_type": event,
-                "severity": severity,
-                "raw_effective": raw_effective or "0000-00-00",
-                "effective": effective_time,
-                "expires": expires_time,
-                "geometries": geometries
-            }
-    except Exception:
-        pass
-    return alert_id, None
+        alert = parse_cap_alert_xml(r.content)
+        alert["id"] = alert_id
+        return alert_id, alert
+    except (requests.RequestException, ValueError) as error:
+        print(f"[Alert Fetch] Failed to parse alert {alert_id}: {error}", flush=True)
+        return alert_id, None
 
 def background_alert_harvester():
     global ALERT_CACHE, NEW_ALERT_IDS, PREVIOUSLY_SEEN_IDS
@@ -917,6 +1052,29 @@ def visibility_settings():
                 return redirect(url_for('visibility_settings', custom_saved='1'))
             except ValueError as error:
                 custom_error = str(error)
+        elif action == "add_custom_xml":
+            try:
+                if (
+                    request.content_length is not None
+                    and request.content_length > MAX_CAP_XML_UPLOAD_BYTES + 65536
+                ):
+                    raise ValueError("CAP XML files must be 5 MB or smaller.")
+                uploaded_file = request.files.get("cap_xml")
+                if uploaded_file is None or not uploaded_file.filename:
+                    raise ValueError("Choose a CAP XML file to import.")
+                xml_content = uploaded_file.stream.read(MAX_CAP_XML_UPLOAD_BYTES + 1)
+                if len(xml_content) > MAX_CAP_XML_UPLOAD_BYTES:
+                    raise ValueError("CAP XML files must be 5 MB or smaller.")
+                custom_alerts.append(build_uploaded_cap_alert(xml_content))
+                save_custom_alerts(custom_alerts)
+                return redirect(url_for('visibility_settings', custom_saved='1'))
+            except ValueError as error:
+                custom_error = str(error)
+        elif action == "set_custom_time_filter":
+            save_show_all_custom_alerts(
+                request.form.get("show_all_custom_alerts") == "1"
+            )
+            return redirect(url_for('visibility_settings', custom_saved='1'))
         elif action in {"toggle_custom", "delete_custom"}:
             custom_id = request.form.get("custom_id")
             if action == "delete_custom":
@@ -928,17 +1086,20 @@ def visibility_settings():
             save_custom_alerts(custom_alerts)
             return redirect(url_for('visibility_settings', custom_saved='1'))
 
-        if action == "add_custom" and custom_error:
+        if action in {"add_custom", "add_custom_xml"} and custom_error:
             pass
         else:
             custom_error = None
 
-        if action == "add_custom" and custom_error:
+        if action in {"add_custom", "add_custom_xml"} and custom_error:
             with cache_lock:
                 active_alerts = sorted(list(ALERT_CACHE.values()), key=get_alert_start_time, reverse=True)
-            invalid_field = "custom_polygon" if "polygon" in custom_error.lower() else "custom_title"
+            if action == "add_custom_xml":
+                invalid_field = "custom_xml"
+            else:
+                invalid_field = "custom_polygon" if "polygon" in custom_error.lower() else "custom_title"
             custom_alerts = sorted(custom_alerts, key=get_alert_start_time, reverse=True)
-            return render_template_string(SETTINGS_TEMPLATE, active_alerts=active_alerts, hidden_ids=load_hidden_alert_ids(), custom_alerts=custom_alerts, get_alert_display_name=get_alert_display_name, custom_error=custom_error, custom_form=request.form.to_dict(), invalid_field=invalid_field)
+            return render_template_string(SETTINGS_TEMPLATE, active_alerts=active_alerts, hidden_ids=load_hidden_alert_ids(), custom_alerts=custom_alerts, get_alert_display_name=get_alert_display_name, custom_error=custom_error, custom_form=request.form.to_dict(), invalid_field=invalid_field, show_all_custom_alerts=load_show_all_custom_alerts())
 
         with cache_lock:
             active_ids = {str(alert_id) for alert_id in ALERT_CACHE}
@@ -961,7 +1122,8 @@ def visibility_settings():
     custom_alerts = sorted(load_custom_alerts(), key=get_alert_start_time, reverse=True)
     return render_template_string(SETTINGS_TEMPLATE,
         active_alerts=active_alerts, hidden_ids=hidden_ids, custom_alerts=custom_alerts,
-        get_alert_display_name=get_alert_display_name, custom_error=None, custom_form={}, invalid_field=None)
+        get_alert_display_name=get_alert_display_name, custom_error=None, custom_form={}, invalid_field=None,
+        show_all_custom_alerts=load_show_all_custom_alerts())
 
 SETTINGS_TEMPLATE = """
 <!doctype html>
@@ -994,6 +1156,9 @@ SETTINGS_TEMPLATE = """
         .custom-form label { font-weight: 600; }
         .custom-form input, .custom-form select, .custom-form textarea { background: var(--panel-2); border: 1px solid var(--line); border-radius: 3px; color: var(--ink); display: block; margin-top: .25rem; width: 100%; }
         .custom-form textarea { min-height: 80px; resize: vertical; }
+        .custom-form .custom-option { align-items: center; display: flex; gap: .55rem; }
+        .custom-form .custom-option input { display: inline-block; flex: 0 0 auto; margin: 0; width: auto; }
+        .custom-time-help { color: var(--muted); font-size: .9rem; }
         .field-label { align-items: center; display: flex; gap: .35rem; }
         .help-mark { align-items: center; background: #f1f3f4; border: 1px solid #9aa0a6; border-radius: 50%; color: #3c4043; cursor: help; display: inline-flex; font-size: .75rem; font-weight: 700; height: 1.25rem; justify-content: center; line-height: 1.1rem; width: 1.25rem; }
         .help-tip { background: #202124; border-radius: 3px; color: #fff; display: inline-block; font-size: .75rem; font-weight: 400; margin-left: .4rem; max-width: 260px; padding: .35rem .5rem; vertical-align: middle; }
@@ -1043,6 +1208,24 @@ SETTINGS_TEMPLATE = """
     <details class="custom-section">
         <summary>Custom alerts ({{ custom_alerts|length }})</summary>
         <p>Create map/KML-only alerts for testing or demonstrations. They are stored separately from FPAS alerts.</p>
+        <form class="custom-form" method="post">
+            <input type="hidden" name="action" value="set_custom_time_filter">
+            <label class="custom-option">
+                <input type="checkbox" name="show_all_custom_alerts" value="1"{% if show_all_custom_alerts %} checked{% endif %}>
+                <span>Show all custom alerts regardless of start/end time</span>
+            </label>
+            <small class="custom-time-help">Uncheck to show only custom alerts within their configured time window. Missing or invalid time boundaries are treated as unlimited.</small>
+            <button type="submit">Save custom alert display option</button>
+        </form>
+        <form class="custom-form" method="post" enctype="multipart/form-data">
+            <input type="hidden" name="action" value="add_custom_xml">
+            <label class="{% if invalid_field == 'custom_xml' %}invalid{% endif %}">
+                <span class="field-label">Import CAP alert XML</span>
+                <input type="file" name="cap_xml" accept=".xml,application/xml,text/xml" required>
+            </label>
+            <button type="submit">Import XML alert</button>
+        </form>
+        <p>Or create a custom alert manually:</p>
         <form class="custom-form" method="post">
             <input type="hidden" name="action" value="add_custom">
             <label class="{% if invalid_field == 'custom_title' %}invalid{% endif %}"><span class="field-label">Title <span class="help-mark" title="Example: Demonstration Flood Warning">?</span></span><input name="custom_title" required value="{{ custom_form.get('custom_title', '') }}" placeholder="Example: Demonstration Flood Warning"></label>
@@ -1108,7 +1291,7 @@ def serve_kml():
         )
         current_new_ids = set(NEW_ALERT_IDS)
 
-    cached_alerts.extend(alert for alert in load_custom_alerts() if alert.get("enabled", True))
+    cached_alerts.extend(get_visible_custom_alerts())
     cached_alerts.sort(key=lambda alert: alert.get("raw_effective", ""), reverse=True)
 
     print(f"Request detected, Serving {len(cached_alerts)} visible alerts from local memory.", flush=True)
@@ -1459,6 +1642,22 @@ def serve_kml():
         pin.visibility = 1
         pin.altitudemode = simplekml.AltitudeMode.relativetoground
         pin.description = popup_content
+
+        view_geometries = [
+            geometry
+            for stacked_pin in stacked_pins
+            for geometry in stacked_pin["geoms"]
+        ]
+        view_range = calculate_geometry_view_range(
+            view_geometries,
+            lead_pin["raw_lon"],
+            lead_pin["raw_lat"],
+        )
+        if view_range > 0:
+            pin.lookat.longitude = lead_pin["raw_lon"]
+            pin.lookat.latitude = lead_pin["raw_lat"]
+            pin.lookat.tilt = 0
+            pin.lookat.range = view_range
 
         style_map = simplekml.StyleMap()
 
